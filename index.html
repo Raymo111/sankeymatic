@@ -1,0 +1,2091 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <title>SankeyMATIC Diagram Generator</title>
+  <style>
+    :root {
+      --nav-level-1-bg: #013355;
+      --deep-blue: #036;
+      --dark-blue: #047;
+      --secondary-background: #057;
+      --medium-blue: #069;
+      --button-blue: #10afff;
+      --light-blue: #27a;
+      --lighter-blue: #5ec9ff;
+      --gray-blue: #9ac;
+      --pale-blue-0: #c0eaff;
+      --pale-blue-1: #e7f7ff;
+
+      --bg-medium: #bdf;
+      --bg-light: #def;
+      --bg-pale: #eef7ff;
+      --bg-palest: #fbfeff;
+      --bg-pale-warning: #fffff8;
+      --bg-attention: #e3ff9f;
+      --bg-plain-primary: #e6e6e6;
+      --bg-plain-secondary: #f8f8f8;
+
+      --selected-option: #00557f;
+      --warning: darkred;
+
+      --gray60: #999;
+      --lighter-gray: #f1f5f9;
+      --text-plain: #333;
+
+      --border-base: 1px solid var(--medium-blue);
+      --border-dark: 1px solid var(--deep-blue);
+      --border-light: 1px solid var(--gray-blue);
+      --border-gray: 1px solid var(--gray60);
+      --border-dotted: 1px dotted var(--medium-blue);
+
+      --screen-sm: 675px;
+      --screen-md: 1024px;
+      --screen-lg: 1280px;
+
+      --grid-gap: 0.5em;
+    }
+
+    body {
+      font-size: small;
+      font-family: sans-serif;
+      background-color: #FBFDFD;
+      margin: 0;
+    }
+
+    /* items for screen readers which do not need to be visible: */
+    .sr-only {
+      border: 0;
+      clip: rect(1px, 1px, 1px, 1px);
+      -webkit-clip-path: inset(50%);
+      clip-path: inset(50%);
+      height: 1px;
+      overflow: hidden;
+      margin: -1px;
+      padding: 0;
+      position: absolute;
+      width: 1px;
+      white-space: nowrap;
+    }
+
+    .smalllabel { font-size: 90%; }
+
+    .grid_entire_row {
+      grid-column: 1 / -1;
+    }
+
+    .grid_sidebar_right {
+      display: grid;
+      grid-template-columns: 1fr fit-content(10ch);
+    }
+
+    /* Hover effects for slider value display: */
+    .fade-init {
+      visibility: hidden;
+      opacity: 0;
+    }
+
+    .fade-in {
+      visibility: visible;
+      opacity: 1;
+      transition: opacity 0.2s;
+    }
+
+    .fade-out {
+      visibility: hidden;
+      opacity: 0;
+      transition: visibility 0s 1s, opacity 1s;
+    }
+
+    /* This is required in order to absolute-position anything inside an element: */
+    .output_container { position: relative; }
+
+    output {
+      position: absolute;
+      top: -1.5em;
+      padding: 0.15em 0.1em;
+      border-radius: 0.6em;
+      text-align: center;
+      background-color: var(--bg-pale);
+      color: var(--selected-option);
+      border: var(--border-dark);
+      font-variant-numeric: tabular-nums;
+    }
+
+    code {
+      padding: 0.15em 0.25em;
+      border: var(--border-dotted);
+      background-color: var(--pale-blue-1);
+    }
+
+    details code {
+      background-color: var(--bg-palest);
+    }
+
+    /* If there are tick (list) marks, they move the hint text down.
+       This adjusts it back upward. */
+    span > span + span.output_container > input[list] + output { top: -2.2em; }
+
+    /* If we're in a <div>, tick geometry works differently: */
+    div > span.output_container > input[list] + output { top: -1.3em; }
+
+    /* firefox has a very different idea of the slider size; compensate here: */
+    @supports  (-moz-appearance:none) {
+      output { top: -2.2em; }
+    }
+
+    .number_10s { width: 2.5em; max-width: 100%; }
+    .number_100s { width: 3.1em; max-width: 100%; }
+    .number_10000s { width: 4.25em; max-width: 100%; }
+
+    /* sometimes we need invisible 0s: */
+    .invis { color: var(--bg-pale); }
+
+    /* Sizes for various controls: */
+    .slider_xxsmall { width: 3em; max-width: 100%; }
+    .slider_xsmall { width: 4.5em; max-width: 100%; }
+    .slider_small { width: 6em; max-width: 100%; }
+    .slider_medium { width: 9.5em; max-width: 100%; }
+
+    /* The output 'width' here refers to the size of the value which might
+    be shown, not the size of the slider. */
+    .output_3 { width: 2.5em; }
+    .output_4 { width: 3.3em; }
+    .output_6 { width: 5em; }
+    .output_9 { width: 6em; }
+    .output_12 { width: 7em; }
+
+    /* Combinations of slider + output sizes affect where hints should appear: */
+    .slider_xxsmall + .output_3 { left: 0.25em; }
+    .slider_xsmall + .output_3 { left: 1.05em; }
+    .slider_xsmall + .output_6 { left: -0.2em; }
+    .slider_small + .output_3 { left: 1.9em; }
+    .slider_small + .output_4 { left: 1.4em; }
+    .slider_small + .output_6 { left: 0.6em; }
+    .slider_small + .output_12 { left: -0.45em; }
+    .slider_medium + .output_3 { left: 3.7em; }
+    .slider_medium + .output_6 { left: 2.5em; }
+    .slider_medium + .output_9 { left: 1.9em; }
+    .slider_medium + .output_12 { left: 1.3em; }
+
+    .font_sans { font-family: sans-serif; }
+    .font_serif { font-family: serif; }
+    .font_mono { font-family: monospace; }
+
+    .font_lighter { font-weight: lighter; }
+    .font_bolder { font-weight: bolder; }
+
+    .text_right { text-align: right; }
+    .text_left { text-align: left; }
+    .text_center { text-align: center; }
+
+    .hidden_under {
+      opacity: 0; /* not gone, just not visible */
+      z-index: -1; /* move under the regular UI */
+      position: absolute; /* don't take up space in the visible layout */
+    }
+
+    /* START WEBKIT TWEAKS
+       Make WebKit (Safari/Chrome) sliders a tiny bit more accessible:
+       (Firefox doesn't have this issue.) */
+
+    /* 1. Replace the regular slider track with a color-customizable one: */
+    input[type="range"]::-webkit-slider-runnable-track {
+      -webkit-appearance: none;
+      height: 4px;
+      background-color: #aaa;
+    }
+
+    /* 2. Align the 'thumb' with the revised slider track: */
+    input[type="range"]::-webkit-slider-thumb {
+      margin-top: -6px;
+    }
+
+    /* 3. When selected with the keyboard OR mouse, highlight the slider
+          background with an accent color: */
+    input[type="range"]:focus::-webkit-slider-runnable-track,
+    input[type="range"]:active::-webkit-slider-runnable-track {
+      background-color: #06c;
+    }
+
+    /* END WEBKIT TWEAKS */
+
+    [aria-disabled="true"] {
+      opacity: 0.5;
+    }
+
+    .hs-sm-vs,
+    .hs-md-vs,
+    .hs {
+      display: flex;
+      flex-direction: row;
+    }
+    /* Ensure horizontal flex groups within form chunks can wrap */
+    .form_chunk .hs {
+        flex-wrap: wrap;
+    }
+
+    .vs {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .f-middle {
+      align-items: center;
+      justify-content: center;
+    }
+
+    .gap-tiny { gap: 0.1em; }
+    .gap-small { gap: 0.5em; }
+    .gap-medium { gap: 1em; }
+    .gap-large { gap: 2em; }
+
+    .align-start { align-items: start; }
+    .align-center { align-items: center; }
+    .align-baseline { align-items: baseline; }
+    .space-between { justify-content: space-between; }
+    .space-around { justify-content: space-around; }
+    .justify-center { justify-content: center; }
+
+    .b-divider {
+      padding-bottom: 0.5em;
+      border-bottom: var(--border-light);
+    }
+
+    .b-pad { padding-bottom: 0.5em; }
+    .t-pad { padding-top: 0.5em; }
+    .l-pad { padding-left: 0.5em; }
+
+    .rrect {
+      border-radius: 0.6em;
+      background-color: var(--bg-pale);
+      border: var(--border-gray);
+    }
+
+    .arr-option {
+      padding: 0.2em 0.4em;
+      background-color: var(--bg-palest);
+    }
+
+    .arr-option > input[type="radio"] {
+      margin: 3px;
+    }
+
+    a {
+      color: var(--medium-blue);
+      text-decoration: none;
+    }
+
+    a:hover {
+      color: var(--dark-blue);
+      text-decoration: underline;
+    }
+
+    /* Make links which open a new window look distinct: */
+
+    a:not(.internal-link)[target="_blank"] {
+      color: var(--deep-blue);
+      background-color: var(--pale-blue-1);
+      border-top: var(--border-gray);
+    }
+
+    a:not(.internal-link)[target="_blank"]:hover,
+    a:not(.internal-link)[target="_blank"]:focus-visible {
+      background-color: var(--pale-blue-0);
+      border-top: var(--border-dotted);
+    }
+
+    main { margin: 1em; }
+
+    /* cellspacing=0 for all tables */
+    table {
+      border-collapse: collapse;
+      border-spacing: 0;
+    }
+
+    td {
+      vertical-align: top;
+      padding: 2px;
+      text-align: left;
+    }
+
+    .pad-small { padding: 0.3em; }
+    .pad-medium { padding: 0.7em; }
+
+    .errormessage {
+      background-color: #fed;
+      width: fit-content;
+      color: #600;
+      border: 1px solid indianred;
+      padding: 4px;
+      margin: -1px 2px;
+    }
+
+    .okmessage {
+      background-color: var(--bg-light);
+      width: fit-content;
+      color: var(--deep-blue);
+      border: var(--border-base);
+      padding: 4px;
+      margin: 2px;
+    }
+
+    .importanttext {
+      color: var(--warning);
+      background-color: inherit;
+      text-decoration: underline;
+    }
+
+    dfn {
+      font-style: normal;
+      border-bottom: var(--border-dotted);
+    }
+
+    .center_basic {
+      /* centering, in 2014: :-\ */
+      margin: 0 auto;
+      display: table;
+    }
+
+    .center { margin-inline: auto; }
+    .indented { margin-inline: 2em; }
+    .vspace { margin-block: 1em; }
+
+    .center_para {
+      margin: 0 auto 4px;
+      display: table;
+      padding-top: 4px;
+      padding-bottom: 4px;
+    }
+
+    .padded-inline { padding-inline: 0.4em; }
+
+    .indicator,
+    .float_right {
+      float: right;
+    }
+
+    .left_checkbox {
+      float: left;
+      margin-right: 0.5em;
+    }
+
+    .right_checkbox {
+      float: right;
+      margin-left: 0.5em;
+    }
+
+    /* The textarea where the user is typing: */
+    #flows_in {
+      border: var(--border-base);
+      padding: 0.25em;
+      margin: 0.25em;
+      font-family: sans-serif;
+      font-size: small;
+      vertical-align: middle;
+      width: 95%; /* Make it fit better in the sidebar */
+    }
+
+    .form_elements {
+      margin: 2px 3px 5px;
+    }
+
+    .form_elements1 {
+      background-color: inherit;
+      margin: 2px 3px 5px;
+      padding: 2px 3px;
+    }
+
+    .form_elements2 {
+      background-color: #ddf0ff;
+      margin: 2px 3px 5px;
+      padding: 2px 3px;
+    }
+
+    .form_elements3 {
+      background-color: var(--bg-pale);
+      border: var(--border-light);
+      margin: 2px 3px 5px;
+      padding: 3px 4px;
+    }
+
+    .share-box {
+      border: 2px solid var(--light-blue);
+      margin: 0.1em 0.2em 0.5em;
+      padding: 0.25em 0.4em;
+    }
+
+    /* for items which need leftward breathing room: */
+    .spaced_label,
+    .spaced_checkbox {
+      margin-left: 0.8em;
+    }
+
+    .ui_head {
+      padding: 3px 6px 2px;
+      margin: 2px 0 0;
+      color: white;
+      text-align: left;
+    }
+
+    h2.ui_head {
+      font-size: medium;
+      background-color: var(--dark-blue);
+    }
+
+    h2.ui_head:hover {
+      background-color: var(--medium-blue);
+    }
+
+    h3.ui_head {
+      font-size: small;
+      background-color: #37b;
+    }
+
+    h3.ui_head:hover {
+      background-color: #39d;
+    }
+
+    span.toggleable {
+      background-color: var(--bg-pale);
+      color: black;
+      padding: 0.1em 0.2em;
+      border: var(--border-light);
+      border-radius: 0.3em;
+      font-style: italic;
+      vertical-align: middle;
+    }
+
+    span.toggleable:hover {
+      color: var(--selected-option);
+      cursor: pointer;
+    }
+
+    #imbalance_control {
+      padding: 0.4em 0.5em;
+      background-color: var(--bg-light);
+      color: var(--deep-blue);
+      border: var(--border-base);
+      margin-top: 0.3em;
+      width: fit-content;
+    }
+
+    .differencemessage {
+      background-color: var(--bg-pale-warning);
+      text-align: center;
+      border: var(--border-base);
+      padding: 0.3em;
+    }
+
+    .differencemessage table {
+      border-spacing: 0.75em 0;
+      border-collapse: separate;
+    }
+
+    .differencemessage table th {
+      padding: 0.1em 0.2em 0;
+      text-align: right;
+      border-bottom: var(--border-dark);
+    }
+
+    .differencemessage table td {
+      padding: 0.2em;
+      text-align: right;
+    }
+
+    .differencemessage table td.nodename {
+      text-align: left;
+      word-break: break-all; /* Force break for very long node names */
+      max-width: 150px; /* Adjust as needed for sidebar */
+      white-space: normal; /* Ensure it wraps */
+    }
+
+    #messages_area {
+      padding: 0.4em;
+      text-align: center;
+      background-color: var(--bg-light);
+      color: var(--deep-blue);
+      border: var(--border-base);
+    }
+
+    #messages h4 {
+      margin: 0 0 0.2em;
+      text-decoration: underline;
+    }
+
+    #console_area {
+      color: var(--text-plain);
+      border: var(--border-gray);
+    }
+
+    #console_area details > summary {
+      background-color: var(--bg-plain-primary);
+      border: none;
+    }
+
+    #console_area details {
+      margin: 0;
+      border: none;
+      background-color: var(--bg-plain-secondary)
+    }
+
+    #console_area div {
+      border: none;
+    }
+
+    .info_text {
+      color: var(--dark-blue);
+    }
+
+    .calced {
+      color: var(--light-blue);
+      font-weight: bold;
+    }
+
+    span.underline {
+      border-bottom: var(--border-dark);
+      display: inline-block;
+      margin-bottom: 0.3em;
+    }
+
+    p.lastrow {
+      border-top: var(--border-base);
+      margin: 0.3em;
+      padding: 0.1em;
+    }
+
+    .expandable_box {
+      max-width: fit-content;
+      min-width: 280px; /* Adjusted for sidebar */
+    }
+
+    .form_chunk {
+      color: #024;
+      background-color: var(--bg-palest);
+      margin: 0 3px 5px;
+      padding: 2px;
+      border: var(--border-light);
+      border-width: 0 1px 1px;
+    }
+
+    p#chart {
+      width: 280px; /* Adjusted for sidebar */
+      height: 280px; /* Adjusted for sidebar */
+      border: 1px dotted #666;
+      margin: 0.4em auto;
+    }
+
+    .svg_background_default {
+      background-color: white;
+      background-image: none;
+    }
+
+    .svg_background_transparent {
+      background-color: transparent;
+      /* Base64 encoded 1x1 transparent PNG. A real one would be much longer. */
+      background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=");
+    }
+
+    .node rect { cursor: move; }
+
+    output,
+    svg g#sankey_labels text,
+    svg g#sankey_labels rect {
+      pointer-events: none;
+    }
+
+    .diagram_controls {
+      padding: 0 2px;
+      background-color: #cce8ff;
+      vertical-align: start;
+    }
+
+    td#grapharea {
+      padding: 0;
+      margin: 0;
+    }
+
+    th#title {
+      padding: 5px 10px;
+      background-color: #8bc;
+      font-size: large;
+    }
+
+    legend {
+      font-weight: bold;
+      color: black;
+      background-color: var(--bg-pale);
+      border: var(--border-light);
+      padding: 0.1em 0.4em;
+      margin-bottom: 0;
+    }
+
+    fieldset { border: var(--border-light); }
+
+    .fieldset_contents {
+      padding-inline: 0.5em;
+      margin-top: 0;
+      padding-top: 0;
+    }
+
+    .download_link {
+      margin-top: 8px;
+    }
+
+    .download_link a {
+      background-color: #acf;
+      border: var(--border-base);
+      padding: 5px 8px;
+    }
+
+    .separated_stack {
+      display: grid;
+      grid-template-rows: 1fr 1fr;
+      align-content: space-between;
+    }
+
+    .top_center_self {
+      place-self: start center;
+      padding: 1em 0.2em;
+    }
+
+    .bottom_center_self {
+      place-self: end center;
+      padding: 1em 0.2em 0;
+    }
+
+    #download_central button,
+    .loadsave_button,
+    .google-button { /* Added google-button class */
+      background-color: var(--medium-blue);
+      color: white;
+      border-radius: 0.4em;
+      border: var(--border-base);
+      cursor: pointer;
+      vertical-align: middle;
+      padding: 0.25em 0.5em;
+      margin-top: 5px; /* Added margin for spacing */
+    }
+
+    #download_central button:hover,
+    .loadsave_button:hover,
+    .google-button:hover { /* Added google-button class */
+      background-color: var(--light-blue);
+    }
+
+    .loadsave_button {
+      font-size: small;
+      background-color: var(--dark-blue);
+      min-width: 5.2em;
+    }
+
+    .loadsave_button:hover {
+      background-color: var(--medium-blue);
+    }
+
+    .label_as_button {
+      display: inline-block;
+      box-sizing: border-box;
+      width: 100%;
+    }
+
+    input[type="file"]:focus + label {
+      outline: 2px solid var(--medium-blue);
+      outline: -webkit-focus-ring-color auto 5px;
+    }
+
+    button#save_as_svg {
+      background-color: #304550;
+      border-color: #1d3030;
+    }
+
+    button#save_as_svg:hover {
+      background-color: #495961;
+    }
+
+    #example_diagrams {
+      width: fit-content;
+      background-color: #f3f4ff;
+      border: var(--border-base);
+      border-style: dotted;
+      border-radius: 0.7em;
+      margin: 0 auto 0.5em;
+      padding: 0.25em 1em;
+      box-shadow: 0.1em 0.1em 0.2em gray;
+    }
+
+    #example_diagrams h4 {
+      margin-top: 0;
+      margin-bottom: 0;
+    }
+
+    #example_diagrams button { margin-inline: 0.5em; }
+
+    #replace_graph_warning {
+      background-color: #ffa;
+      color: var(--warning);
+      margin: 0.2em 3em 0;
+      padding: 0.3em;
+      border-radius: 0.5em;
+    }
+
+    #replace_graph_yes {
+      color: var(--warning);
+    }
+
+    #reset_moves_area {
+      margin-left: 0.1em;
+      margin-bottom: 0;
+    }
+
+    .callout-container {
+      background-color: var(--secondary-background);
+      color: white;
+      width: 100%;
+      text-align: center;
+    }
+
+    .callout-container a {
+      color: var(--bg-medium);
+    }
+
+    .callout-container a:hover {
+      color: var(--lighter-blue);
+    }
+
+    .attention-bar {
+      padding: 0.4em;
+      margin-top: 0;
+      background-color: var(--bg-attention);
+      border-bottom: var(--border-dotted);
+      text-align: center;
+    }
+
+    .attention-bar a {
+      color: var(--dark-blue);
+      text-decoration: dashed underline;
+    }
+
+    .attention-bar a:hover {
+      color: var(--deep-blue);
+    }
+
+    #color_themes tr td {
+      vertical-align: baseline;
+      padding: 1px 2px;
+    }
+
+    .no_wrap,
+    .theme_container {
+      white-space: nowrap;
+    }
+
+    .color_sample_12 { padding-inline: 0.35em; }
+    .color_sample_10 { padding-inline: 0.45em; }
+    .color_sample_9 { padding-inline: 0.517em; }
+    .color_sample_8 { padding-inline: 0.599em; }
+
+    .highlight_fld_label {
+      background-color: #fffc;
+      padding: 0.25em 0.3em;
+      border-radius: 0.5em;
+    }
+
+    .bg-darker { background-color: var(--bg-medium); }
+
+    .ropt,
+    .rnote {
+      color: #293030;
+    }
+
+    input:checked ~ label.ropt,
+    .theme_container input:checked ~ * {
+      color: var(--selected-option);
+    }
+
+    #getLinkDialog {
+      box-shadow: 0.2em 0.2em 0.2em gray;
+      border-radius: 1em;
+      border: var(--border-base);
+      max-width: 90%;
+    }
+
+    #getLinkDialog::backdrop {
+      opacity: 0.55;
+      background-color: #888;
+    }
+
+    #getLinkDialog header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border: none;
+    }
+
+    #getLinkDialog section {
+      max-width: 50em;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5em;
+    }
+
+    #getLinkDialog section p {
+      margin: 0.5em;
+    }
+
+    .warning-note {
+      background-color: #ffd;
+      color: black;
+      border: 1px solid #600;
+      padding: 0.5em;
+      max-width: 45em;
+    }
+
+    #closeDialogHeader {
+      font-size: x-large;
+      background-color: white;
+      border: none;
+      cursor: pointer;
+    }
+
+    #getLinkDialog footer {
+      background-color: var(--bg-plain-primary);
+      padding: 1em;
+    }
+
+    #closeDialogFooter {
+      background-color: gray;
+      border: none;
+      color: white;
+      cursor: pointer;
+      padding: 0.5em;
+      font-size: medium;
+    }
+
+    #copyLinkButton {
+      font-size: medium;
+    }
+
+    #copiedMsg { font-style: italic; }
+
+    .long-link-area {
+      resize: both;
+      overflow: auto;
+      color: var(--dark-blue);
+      height: 6.5em;
+      max-width: 50em;
+      border: 1px dotted var(--dark-blue);
+      padding: 0.5em;
+      margin-block: 0.5em;
+      overflow-wrap: anywhere;
+    }
+
+    details {
+      margin-block-start: 0.25em;
+      margin-block-end: 0.5em;
+      margin-inline: 0.5em;
+    }
+
+    details > summary {
+      padding: 0.25em 0.5em;
+      cursor: pointer;
+      border: var(--border-dotted);
+    }
+
+    details > div {
+      padding: 0.5em;
+      border: var(--border-light);
+      border-top: none;
+    }
+
+    fieldset.simple {
+      padding: 0.5em;
+      background-color: var(--bg-palest);
+    }
+
+    .form_chunk details,
+    .form_chunk details > summary,
+    .form_elements1 details,
+    .form_elements1 details > summary {
+      background-color: var(--bg-pale);
+    }
+
+    .form_chunk details[open] > summary,
+    .form_elements1 details[open] > summary {
+      background-color: var(--bg-light);
+    }
+
+    .skm_grid {
+      display: grid;
+      /* Adjusted for single column sidebar */
+      grid-template-columns: 1fr;
+      grid-template-rows: auto auto auto auto auto auto 1fr; /* Added rows for new buttons */
+      grid-template-areas:
+        "controls"
+        "google_buttons" /* New area for Google buttons */
+        "export"
+        "size"
+        "main"
+        "about";
+      grid-column-gap: var(--grid-gap);
+       grid-row-gap: var(--grid-gap); /* Added row gap */
+    }
+
+    .skm_grid > div {
+      height: fit-content;
+    }
+
+    .skm_grid > .diagram_controls { grid-area: controls; }
+    .google-buttons-container { grid-area: google_buttons; text-align: center; } /* Styling for new button container */
+    .diagram_size     { grid-area: size; }
+    .diagram_export   { grid-area: export; }
+    .diagram_main     { grid-area: main; }
+    .diagram_about    { grid-area: about; }
+
+
+    /* media query land */
+    @media screen and (width <= 1024px) {
+      .hs-md-vs { flex-direction: column; }
+    }
+
+    @media (width <= 900px) {
+      main { margin: 0.5em; }
+      .okmessage { place-self: center; }
+      .skm_grid {
+        grid-template-columns: 100%; /* Ensure it takes full width */
+        grid-template-rows: auto;
+        grid-template-areas:
+          "main"
+          "export"
+          "google_buttons"
+          "about"
+          "size"
+          "controls";
+        justify-items: center;
+        grid-row-gap: var(--grid-gap);
+      }
+      #reset_moves_area,
+      #download_central {
+        text-align: center;
+        line-height: 1.8em;
+        text-wrap: pretty;
+      }
+      p#chart { max-width: 100%; } /* Ensure chart is responsive */
+    }
+
+    @media screen and (width <= 675px) {
+      main { margin: 0.5em 0; }
+      .hs-sm-vs { flex-direction: column; }
+    }
+
+    /* Specific adjustments for sidebar width */
+    body {
+        max-width: 300px; /* Max width of the sidebar */
+        overflow-x: hidden; /* Prevent horizontal scroll */
+    }
+    .expandable_box {
+        min-width: 0; /* Allow shrinking */
+        width: 100%;
+    }
+    p#chart {
+        width: 100%;
+        height: auto; /* Maintain aspect ratio */
+        min-height: 200px; /* Ensure it's visible */
+    }
+    #sankey_svg, #svg_scratch, #png_preview {
+        width: 100% !important; /* Override inline styles */
+        height: auto !important; /* Maintain aspect ratio */
+    }
+
+  </style>
+</head>
+<body>
+  <main>
+    <div class="center_basic">
+      <form id="skm_form" onsubmit="process_sankey(); return false;">
+        <div class="skm_grid">
+          <div class="center diagram_controls">
+            <h2 class="ui_head" onclick="togglePanel('input_options');">
+              <span id="input_options_indicator" class="indicator">&ndash;</span>
+              Inputs<span id="input_options_hint">:</span>
+            </h2>
+            <div id="input_options" class="text_center grid_sidebar_right">
+              <div>
+                <textarea id="flows_in" title="Diagram Inputs" rows="10" cols="35" class="font_sans" onchange="process_sankey();" onkeyup="debounced_process_sankey();">// Enter Flows between Nodes, like this:
+//         Source [AMOUNT] Target
+Wages [1500] Budget
+Other [250] Budget
+Budget [450] Taxes
+Budget [420] Housing
+Budget [400] Food
+Budget [255] Transportation
+// You can set a Node's color, like this:
+:Budget #057
+//            ...or a color for a single Flow:
+Budget [160] Other Necessities #606
+// "[*]" means "Use any amount left over":
+Budget [*] Savings</textarea>
+              </div>
+              <div class="separated_stack">
+                <div class="top_center_self"><button id="preview_graph" type="submit">Show &gt;</button></div>
+              </div>
+              <p class="form_elements3 grid_entire_row">
+                <strong>Arrange the diagram:</strong><br />
+                <span><input name="layout_order" id="layout_order_automatic" value="automatic" type="radio" onchange="process_sankey();" checked="checked" /><label for="layout_order_automatic" class="ropt">Automatically</label></span>
+                <span><input name="layout_order" id="layout_order_exact" value="exact" type="radio" onchange="process_sankey();" class="spaced_checkbox" /><label for="layout_order_exact" class="ropt">Using the exact input order</label></span>
+              </p>
+            </div>
+
+            <datalist id="tick100"><option value="100"></option></datalist>
+            <datalist id="tick400"><option value="400"></option></datalist>
+            <datalist id="tick-align">
+              <option value="-1">Before</option>
+              <option value="0">Centered</option>
+              <option value="1">After</option>
+            </datalist>
+            <datalist id="tick-stages">
+              <option value="2"></option><option value="3"></option>
+              <option value="4"></option><option value="5"></option>
+              <option value="6"></option><option value="7"></option>
+              <option value="8"></option><option value="9"></option>
+              <option value="10"></option><option value="11"></option>
+              <option value="12"></option><option value="13"></option>
+              <option value="14"></option><option value="15"></option>
+            </datalist>
+
+            <h2 class="ui_head" onclick="togglePanel('label_options');">
+              <span id="label_options_indicator" class="indicator">+</span>
+              Labels<span id="label_options_hint">...</span>
+            </h2>
+            <div id="label_options" class="form_chunk" style="display: none;">
+              <div class="vs b-pad indented">
+                <div class="hs align-baseline gap-medium">
+                  <span><input type="checkbox" id="labelname_appears" value="1" onchange="process_sankey();" checked="checked">
+                  <label for="labelname_appears" class="ropt">Show <strong>Names</strong></label></span>
+                  <span class="no_wrap" onmouseover="revealVal('labelname_weight');" onmouseout="fadeVal('labelname_weight');"><label for="labelname_weight" class="sr-only">Style for Node Names</label>
+                  <span class="smalllabel font_light">Light</span><span class="output_container"><input id="labelname_weight" class="slider_xsmall" type="range" min="100" max="700" step="300" value="400" list="tick400" onfocus="revealVal('labelname_weight');" onblur="fadeVal('labelname_weight');" oninput="updateOutput('labelname_weight'); process_sankey();" onchange="process_sankey();"><output id="labelname_weight_val" for="labelname_weight" class="fade-init output_6">-</output></span><span class="smalllabel font_bolder">Bold</span></span>
+                </div>
+                <div class="hs align-baseline gap-medium">
+                  <span><input type="checkbox" id="labelvalue_appears" value="1" onchange="process_sankey();" checked="checked">
+                  <label for="labelvalue_appears" class="ropt">Show <strong>Values</strong></label></span>
+                  <span class="no_wrap" onmouseover="revealVal('labelvalue_weight');" onmouseout="fadeVal('labelvalue_weight');"><label for="labelvalue_weight" class="sr-only">Style for Node Values</label>
+                  <span class="smalllabel font_light">Light</span><span class="output_container"><input id="labelvalue_weight" class="slider_xsmall" type="range" min="100" max="700" step="300" value="400" list="tick400" onfocus="revealVal('labelvalue_weight');" onblur="fadeVal('labelvalue_weight');" oninput="updateOutput('labelvalue_weight'); process_sankey();" onchange="process_sankey();"><output id="labelvalue_weight_val" for="labelvalue_weight" class="fade-init output_6">-</output></span><span class="smalllabel font_bolder">Bold</span></span>
+                </div>
+              </div>
+              <div class="hs gap-medium indented align-baseline b-pad">
+                <span>
+                  <strong>Font:</strong>
+                  <span class="no_wrap"><input name="labels_fontface" type="radio" id="sans_serif" value="sans-serif" checked="checked" onchange="process_sankey();" /><label for="sans_serif" class="ropt font_sans">sans</label></span>
+                  <span class="no_wrap"><input name="labels_fontface" type="radio" id="serif" value="serif" onchange="process_sankey();" /><label for="serif" class="ropt font_serif">serif</label></span>
+                  <span class="no_wrap"><input name="labels_fontface" type="radio" id="monospace" value="monospace" onchange="process_sankey();" /><label for="monospace" class="ropt font_mono">mono</label></span>
+                </span>
+                <span><label for="labels_color"><strong>Color:</strong></label> <input type="color" id="labels_color" size="7" maxlength="7" value="#000000" onchange="process_sankey();"></span>
+              </div>
+              <details open><summary><strong>Sizes</strong></summary>
+                <div class="vs gap-small align-center">
+                  <div class="hs align-center justify-center gap-large b-divider">
+                    <div class="vs align-center">
+                      <label for="labelname_size"><strong>Base Size:</strong></label>
+                      <input id="labelname_size" type="number" class="number_100s" min="6" step="0.5" value="16" onchange="process_sankey();">
+                    </div>
+                    <div class="vs align-center text_center" onmouseover="revealVal('labels_relativesize');" onmouseout="fadeVal('labels_relativesize');">
+                      <label for="labels_relativesize" title="Set relative size of Names and Values">Magnify:</label>
+                      <div class="hs align-center gap-small no_wrap">
+                        <div class="align-center"><strong>Names</strong></div>
+                        <span class="output_container"><input id="labels_relativesize" class="slider_small" type="range" min="50" max="150" value="110" list="tick100" onfocus="revealVal('labels_relativesize');" onblur="fadeVal('labels_relativesize');" oninput="updateOutput('labels_relativesize'); process_sankey();" onchange="process_sankey();"><output id="labels_relativesize_val" for="labels_relativesize" class="fade-init output_12">-</output></span>
+                        <div class="align-center"><strong>Values</strong></div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="vs align-center justify-center text_center b-divider" onmouseover="revealVal('labels_magnify');" onmouseout="fadeVal('labels_magnify');">
+                    <label for="labels_magnify">Show larger labels for:</label>
+                    <div class="hs justify-center gap-small no_wrap">
+                      <div class="align-center"><strong>Small</strong><br />Amounts</div>
+                      <span class="output_container"><input id="labels_magnify" class="slider_medium" type="range" min="50" max="150" value="100" list="tick100" onfocus="revealVal('labels_magnify');" onblur="fadeVal('labels_magnify');" oninput="updateOutput('labels_magnify'); process_sankey();" onchange="process_sankey();"><output id="labels_magnify_val" for="labels_magnify" class="fade-init output_12">-</output></span>
+                      <div class="align-center"><strong>Large</strong><br />Amounts</div>
+                    </div>
+                  </div>
+                  <div class="hs gap-small" onmouseover="revealVal('labels_linespacing');" onmouseout="fadeVal('labels_linespacing');">
+                    <label for="labels_linespacing" id="spacing_fld_label"><strong>Line Spacing:</strong></label>
+                    <span class="nowrap">
+                      <span class="smalllabel">Min</span>
+                      <span class="output_container"><input id="labels_linespacing" class="slider_medium" type="range" min="0.0" max="1.0" step="0.05" value="0.2" onfocus="revealVal('labels_linespacing');" onblur="fadeVal('labels_linespacing');" oninput="updateOutput('labels_linespacing'); process_sankey();" onchange="process_sankey();"><output id="labels_linespacing_val" for="labels_linespacing" class="fade-init output_3">-</output></span>
+                      <span class="smalllabel">Max</span>
+                    </span>
+                  </div>
+                  <div class="text_center">Add line breaks inside labels using <code>\n</code></div>
+                </div>
+              </details>
+              <details><summary><strong>Placement</strong></summary>
+                <div>
+                  <div class="vs align-center">
+                    <div class="vs gap-small">
+                      <fieldset class="simple">
+                        <span class="no_wrap"><input name="labelposition_scheme" type="radio" id="label_scheme_auto" value="auto" onchange="process_sankey();" checked="checked" /><label for="label_scheme_auto" class="ropt"><strong>Automatic</strong></label></span>
+                        <div class="hs align-center justify-center gap-small l-pad">
+                          <div class="indented l-pad" style="max-width: 20em;">
+                            When a Node has an <strong>empty side</strong>, place its label there.
+                            <div class="vs align-center justify-center text_center" onmouseover="revealVal('labelposition_autoalign');" onmouseout="fadeVal('labelposition_autoalign');">
+                              <label for="labelposition_autoalign" style="line-height: 2;">When neither side is empty, place labels:</label>
+                              <div class="hs align-center justify-center gap-small">
+                                <div class="align-center no_wrap"><strong>Before</strong><br />the Node</div>
+                                <span class="output_container"><input id="labelposition_autoalign" class="slider_medium" type="range" min="-1" max="1" step="1" value="0" onfocus="revealVal('labelposition_autoalign');" onblur="fadeVal('labelposition_autoalign');" oninput="updateOutput('labelposition_autoalign'); checkRadio('label_scheme_auto'); process_sankey();" onchange="checkRadio('label_scheme_auto'); process_sankey();" list="tick-align"><output id="labelposition_autoalign_val" for="labelposition_autoalign" class="fade-init output_6">-</output></span>
+                                <div class="align-center no_wrap"><strong>After</strong><br />the Node</div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </fieldset>
+                      <fieldset class="simple">
+                        <span class="no_wrap"><input name="labelposition_scheme" type="radio" id="label_scheme_perstage" value="per_stage" onchange="process_sankey();" /><label for="label_scheme_perstage" class="ropt"><strong>Per Stage</strong></label></span>
+                        <div class="hs align-center justify-center gap-small t-pad b-divider">
+                          <span class="text_right">Place labels for<br /> the <strong>first stage</strong>:</span>
+                          <div class="vs">
+                            <span class="no_wrap"><input name="labelposition_first" type="radio" id="label_first_before" value="before" onchange="checkRadio('label_scheme_perstage'); process_sankey();" checked="checked" /><label for="label_first_before" class="ropt">Before the Nodes</label></span>
+                            <span class="no_wrap"><input name="labelposition_first" type="radio" id="label_first_after" value="after" onchange="checkRadio('label_scheme_perstage'); process_sankey();" /><label for="label_first_after" class="ropt">After the Nodes</label></span>
+                          </div>
+                        </div>
+                        <div class="vs align-center justify-center text_center" onmouseover="revealVal('labelposition_breakpoint');" onmouseout="fadeVal('labelposition_breakpoint');">
+                          <label for="labelposition_breakpoint" style="line-height: 2;">Place labels on the <strong>opposite side</strong> starting at:</label>
+                          <div class="hs align-center justify-center gap-small">
+                            <span class="no_wrap">Stage <strong>2</strong></span><span class="output_container"><input id="labelposition_breakpoint" class="slider_medium" type="range" min="2" max="4" step="1" value="4" onfocus="revealVal('labelposition_breakpoint');" onblur="fadeVal('labelposition_breakpoint');" oninput="updateOutput('labelposition_breakpoint'); checkRadio('label_scheme_perstage'); process_sankey();" onchange="checkRadio('label_scheme_perstage'); process_sankey();" list="tick-stages"><output id="labelposition_breakpoint_val" for="labelposition_breakpoint" class="fade-init output_12">-</output></span><span>(Never)</span>
+                          </div>
+                        </div>
+                      </fieldset>
+                    </div>
+                  </div>
+                </div>
+              </details>
+              <details><summary><strong>Arrange Names &amp; Values</strong></summary>
+                <div class="vs justify-center align-center gap-small">
+                  <div class="hs justify-center align-center gap-small b-pad">
+                    <div class="hs align-center gap-small">
+                      <div class="vs gap-small">
+                        <div class="hs align-center">
+                          <input name="labelvalue_position" type="radio" id="labelvalue_after" value="after" onchange="process_sankey();" /><label for="labelvalue_after" class="ropt rrect arr-option">Examples:&nbsp;100</label>
+                        </div>
+                        <div class="hs align-center">
+                          <input name="labelvalue_position" type="radio" id="labelvalue_below" value="below" onchange="process_sankey();" checked="checked" /><label for="labelvalue_below" class="ropt rrect arr-option">Examples<br />100</label>
+                        </div>
+                      </div>
+                      <div class="vs gap-small">
+                        <div class="hs align-center">
+                          <input name="labelvalue_position" type="radio" id="labelvalue_before" value="before" onchange="process_sankey();" /><label for="labelvalue_before" class="ropt rrect arr-option">100&nbsp;Examples</label>
+                        </div>
+                        <div class="hs align-center">
+                          <input name="labelvalue_position" type="radio" id="labelvalue_above" value="above" onchange="process_sankey();" /><label for="labelvalue_above" class="ropt rrect arr-option">100<br />Examples</label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="hs gap-medium space-around align-center bg-darker pad-medium" onmouseover="revealVal('labels_highlight');" onmouseout="fadeVal('labels_highlight');">
+                    <label for="labels_highlight" class="highlight_fld_label"><strong>Highlights:</strong></label>
+                    <div><span class="smalllabel">0</span><span class="output_container"><input id="labels_highlight" class="slider_small" type="range" min="0" max="0.9" step="0.05" value="0.75" onfocus="revealVal('labels_highlight');" onblur="fadeVal('labels_highlight');" oninput="updateOutput('labels_highlight'); process_sankey();" onchange="process_sankey();"><output id="labels_highlight_val" for="labels_highlight" class="fade-init output_3">-</output></span><span class="smalllabel highlight_fld_label">Max</span>
+                    </div>
+                  </div>
+                  <span><input type="checkbox" id="labels_hide" value="1" onchange="process_sankey();"><label for="labels_hide" class="ropt">Temporarily Hide Labels</label></span>
+                </div>
+              </details>
+              <details><summary><strong>Number Format</strong></summary>
+                <div class="hs align-center gap-small space-around">
+                  <div class="vs gap-small">
+                    <span><label for="value_prefix">Prefix:</label> <input type="text" id="value_prefix" size="4" maxlength="10" onchange="process_sankey();"></span>
+                    <span><label for="value_suffix">Suffix:</label> <input type="text" id="value_suffix" size="4" maxlength="10" onchange="process_sankey();"></span>
+                  </div>
+                  <div class="text_center">
+                    <label for="value_format">Format:</label>
+                    <select id="value_format" onchange="process_sankey();">
+                      <option value=",." selected="selected">1,000,000.00</option>
+                      <option value=".,">1.000.000,00</option>
+                      <option value=" .">1 000 000.00</option>
+                      <option value=" ,">1 000 000,00</option>
+                      <option value="X.">1000000.00</option>
+                      <option value="X,">1000000,00</option>
+                    </select>
+                    <br />
+                    <span><input type="checkbox" id="labelvalue_fullprecision" value="1" onchange="process_sankey();" checked="checked">
+                    <label for="labelvalue_fullprecision" class="ropt">Show trailing 0s <small>(best for currency)</small></label></span>
+                  </div>
+                </div>
+              </details>
+            </div>
+
+            <h2 class="ui_head" onclick="togglePanel('node_options');">
+              <span id="node_options_indicator" class="indicator">&ndash;</span>
+              Nodes<span id="node_options_hint">:</span>
+            </h2>
+            <div id="node_options" class="form_chunk">
+              <p class="form_elements1">
+                <span class="no_wrap" onmouseover="revealVal('node_h');" onmouseout="fadeVal('node_h');">
+                <label for="node_h"><strong>Height:</strong></label>
+                .<span class="output_container"><input id="node_h" class="slider_small" type="range" min="0" max="100" step="0.5" value="50" onfocus="revealVal('node_h');" onblur="fadeVal('node_h');" oninput="updateOutput('node_h'); process_sankey();" onchange="process_sankey();"><output id="node_h_val" for="node_h" class="fade-init output_6">-</output></span>|</span>
+                <span class="no_wrap" onmouseover="revealVal('node_spacing');" onmouseout="fadeVal('node_spacing');">
+                <label for="node_spacing" class="spaced_label"><strong>Spacing:</strong></label>
+                <span class="smalllabel">0</span><span class="output_container"><input id="node_spacing" class="slider_small" type="range" min="0" max="100" step="0.5" value="75" onfocus="revealVal('node_spacing');" onblur="fadeVal('node_spacing');" oninput="updateOutput('node_spacing'); process_sankey();" onchange="process_sankey();"><output id="node_spacing_val" for="node_spacing" class="fade-init output_6">-</output></span><span class="smalllabel">Max</span></span>
+              </p>
+              <p class="form_elements2">
+                <span class="no_wrap"><label for="node_w"><strong>Width:</strong></label>
+                <input id="node_w" type="number" class="number_100s" min="0" value="12" step="1" onchange="process_sankey();"></span>
+                <span class="no_wrap"><label for="node_border" class="spaced_label"><strong>Border:</strong></label>
+                <input id="node_border" type="number" class="number_10s" min="0" value="0" step="1" onchange="process_sankey();"></span>
+                <span class="no_wrap" onmouseover="revealVal('node_opacity');" onmouseout="fadeVal('node_opacity');">
+                <label for="node_opacity" class="spaced_label"><strong>Opacity:</strong></label>
+                <span class="smalllabel">0</span><span class="output_container"><input id="node_opacity" class="slider_xxsmall" type="range" min="0" max="1" step="0.05" value="1.0" onfocus="revealVal('node_opacity');" onblur="fadeVal('node_opacity');" oninput="updateOutput('node_opacity'); process_sankey();" onchange="process_sankey();"><output id="node_opacity_val" for="node_opacity" class="fade-init output_3">-</output></span><span class="smalllabel">1</span></span>
+              </p>
+              <fieldset class="form_elements1">
+                <legend>Default Node Colors</legend>
+                <div class="fieldset_contents">
+                  Use <input name="node_theme" type="radio" id="node_theme_none" value="none" onchange="process_sankey();" /><label for="node_theme_none" class="ropt">one color:</label>
+                  <input type="color" id="node_color" title="Single Node Color" size="7" maxlength="7" value="#888888" onchange="checkRadio('node_theme_none'); process_sankey();"> or a Theme:<br />
+                  <table id="color_themes">
+                    <tr>
+                      <td><span id="theme_a" class="theme_container"><input name="node_theme" type="radio" id="theme_a_radio" value="a" onchange="process_sankey();" checked="checked" /><label id="theme_a_label" for="theme_a_radio" class="ropt"></label></span></td>
+                      <td><span class="no_wrap"><button id="theme_a_rotate_left" type="submit" title="Rotate theme colors left" onclick="nudgeColorTheme('a',1); return false;">&lt;</button><span id="theme_a_guide"></span><input type="hidden" id="themeoffset_a" value="6"><button id="theme_a_rotate_right" type="submit" title="Rotate theme colors right" onclick="nudgeColorTheme('a',-1); return false;">&gt;</button></span></td>
+                    </tr>
+                    <tr>
+                      <td><span id="theme_b" class="theme_container"><input name="node_theme" type="radio" id="theme_b_radio" value="b" onchange="process_sankey();" /><label id="theme_b_label" for="theme_b_radio" class="ropt"></label></span></td>
+                      <td><span class="no_wrap"><button id="theme_b_rotate_left" type="submit" title="Rotate theme colors left" onclick="nudgeColorTheme('b',1); return false;">&lt;</button><span id="theme_b_guide"></span><input type="hidden" id="themeoffset_b" value="0"><button id="theme_b_rotate_right" type="submit" title="Rotate theme colors right" onclick="nudgeColorTheme('b',-1); return false;">&gt;</button></span></td>
+                    </tr>
+                    <tr>
+                      <td><span id="theme_c" class="theme_container"><input name="node_theme" type="radio" id="theme_c_radio" value="c" onchange="process_sankey();" /><label id="theme_c_label" for="theme_c_radio" class="ropt"></label></span></td>
+                      <td><span class="no_wrap"><button id="theme_c_rotate_left" type="submit" title="Rotate theme colors left" onclick="nudgeColorTheme('c',1); return false;">&lt;</button><span id="theme_c_guide"></span><input type="hidden" id="themeoffset_c" value="0"><button id="theme_c_rotate_right" type="submit" title="Rotate theme colors right" onclick="nudgeColorTheme('c',-1); return false;">&gt;</button></span></td>
+                    </tr>
+                    <tr>
+                      <td><span id="theme_d" class="theme_container"><input name="node_theme" type="radio" id="theme_d_radio" value="d" onchange="process_sankey();" /><label id="theme_d_label" for="theme_d_radio" class="ropt"></label></span></td>
+                      <td><span class="no_wrap"><button id="theme_d_rotate_left" type="submit" title="Rotate theme colors left" onclick="nudgeColorTheme('d',1); return false;">&lt;</button><span id="theme_d_guide"></span><input type="hidden" id="themeoffset_d" value="0"><button id="theme_d_rotate_right" type="submit" title="Rotate theme colors right" onclick="nudgeColorTheme('d',-1); return false;">&gt;</button></span></td>
+                    </tr>
+                  </table>
+                </div>
+              </fieldset>
+            </div>
+
+            <h2 class="ui_head" onclick="togglePanel('flow_options');">
+              <span id="flow_options_indicator" class="indicator">&ndash;</span>
+              Flows<span id="flow_options_hint">:</span>
+            </h2>
+            <div id="flow_options" class="form_chunk">
+              <p class="form_elements1">
+                <span class="no_wrap" onmouseover="revealVal('flow_opacity');" onmouseout="fadeVal('flow_opacity');">
+                <label for="flow_opacity"><strong>Opacity:</strong></label>
+                <span class="smalllabel">0</span><span class="output_container"><input id="flow_opacity" class="slider_xsmall" type="range" min="0" max="1" step="0.05" value="0.45" onfocus="revealVal('flow_opacity');" onblur="fadeVal('flow_opacity');" oninput="updateOutput('flow_opacity'); process_sankey();" onchange="process_sankey();"><output id="flow_opacity_val" for="flow_opacity" class="fade-init output_3">-</output></span><span class="smalllabel">1</span></span>
+                <span class="no_wrap" onmouseover="revealVal('flow_curvature');" onmouseout="fadeVal('flow_curvature');">
+                <label for="flow_curvature" class="spaced_label"><strong>Curviness:</strong></label>&nbsp;
+                |<span class="output_container"><input id="flow_curvature" class="slider_small" type="range" min="0.1" max="0.9" step="0.04" value="0.5" onfocus="revealVal('flow_curvature');" onblur="fadeVal('flow_curvature');" oninput="updateOutput('flow_curvature'); process_sankey();" onchange="process_sankey();"><output id="flow_curvature_val" for="flow_curvature" class="fade-init output_3">-</output></span>(</span>
+              </p>
+              <fieldset class="form_elements2">
+                <legend>Default Flow Colors</legend>
+                <div class="fieldset_contents">
+                  Use <input name="flow_inheritfrom" type="radio" id="flow_inherit_none" value="none" onchange="process_sankey();" /><label for="flow_inherit_none" class="ropt">one color:</label>
+                  <input type="color" id="flow_color" title="Single Flow Color" size="7" maxlength="7" value="#999999" onchange="checkRadio('flow_inherit_none'); process_sankey();" /> or colors from:<br />
+                  <span class="no_wrap"><input name="flow_inheritfrom" type="radio" id="flow_inherit_from_source" value="source" onchange="process_sankey();" /><label class="ropt" for="flow_inherit_from_source">each flow's Source</label></span>
+                  <span class="no_wrap"><input name="flow_inheritfrom" type="radio" id="flow_inherit_from_target" value="target" onchange="process_sankey();" /><label class="ropt" for="flow_inherit_from_target">each flow's Target</label></span>
+                  <br />
+                  <span class="no_wrap"><input name="flow_inheritfrom" type="radio" id="flow_inherit_outside_in" value="outside-in" onchange="process_sankey();" checked="checked" /><label class="ropt" for="flow_inherit_outside_in">the outermost nodes (flowing in)</label></span>
+                </div>
+              </fieldset>
+            </div>
+
+            <h2 class="ui_head" onclick="togglePanel('layout_options');" id="layout_options_section">
+              <span id="layout_options_indicator" class="indicator">+</span>
+              Layout Options<span id="layout_options_hint">...</span>
+            </h2>
+            <div id="layout_options" class="form_chunk" style="display: none;">
+              <div class="form_elements1 text_center">
+                <small>Note: these options only apply to diagrams<br /> with 3 or more columns of nodes:</small>
+                <table style="width: 100%;"><tr>
+                  <td>
+                    <input type="checkbox" id="layout_justifyorigins" value="1" onchange="process_sankey();"><br />
+                    <label for="layout_justifyorigins" class="ropt">Place all<br /> flow <strong>origins</strong><br /> at the <strong>left</strong> edge</label>
+                  </td>
+                  <td class="text_right">
+                    <input type="checkbox" id="layout_justifyends" value="1" onchange="process_sankey();"><br />
+                    <label for="layout_justifyends" class="spaced_label ropt">Place all<br /> flow <strong>endpoints</strong><br /> at the <strong>right</strong> edge</label>
+                  </td>
+                </tr></table>
+              </div>
+              <p class="form_elements2 text_center">
+                <input type="checkbox" id="layout_reversegraph" value="1" onchange="process_sankey();">
+                <label for="layout_reversegraph" class="ropt"><strong>Reverse the graph</strong> (flow right-to-left)</label>
+              </p>
+              <p class="form_elements1 text_center">
+                <strong>Diagram Scale</strong> = <span id="scale_figures"></span><br />
+                For fair comparisons <em>between</em> diagrams:<br />
+                1) Use the same units for each, and 2) Make their<br />
+                Diagram Scales match as closely as possible.
+              </p>
+              <h3 class="ui_head" onclick="togglePanel('debug_options');"><span id="debug_options_indicator" class="indicator">+</span>Tools for Debugging<span id="debug_options_hint">...</span></h3>
+              <div id="debug_options" class="form_chunk" style="display: none;">
+                <div class="form_elements1">
+                  <span class="no_wrap" onmouseover="revealVal('internal_iterations');" onmouseout="fadeVal('internal_iterations');">
+                    <label for="internal_iterations" class="spaced_label"><strong># of Layout Iterations:</strong></label>
+                    <span class="smalllabel">0</span>
+                    <span class="output_container"><input id="internal_iterations" class="slider_small" type="range" min="0" max="30" step="1" value="25" onfocus="revealVal('internal_iterations');" onblur="fadeVal('internal_iterations');" oninput="updateOutput('internal_iterations'); process_sankey();" onchange="process_sankey();"><output id="internal_iterations_val" for="internal_iterations" class="fade-init output_3">-</output></span>
+                    <span class="smalllabel">30</span>
+                  </span>
+                </div>
+                <div class="form_elements2">
+                  <input type="checkbox" id="internal_revealshadows" value="1" onchange="process_sankey();" class="spaced_checkbox"><label for="internal_revealshadows" class="ropt">Reveal Shadow Nodes</label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Google Sheet Interaction Buttons -->
+          <div class="google-buttons-container">
+            <button id="get_data_button" class="google-button" onclick="getDataFromSheetButton()">Get Data from Sheet</button>
+            <button id="insert_image_button" class="google-button" onclick="insertImageToSheetButton()">Insert Diagram to Sheet</button>
+          </div>
+
+
+          <div class="diagram_export">
+            <div class="expandable_box">
+              <p id="download_central" class="share-box">
+                <button id="save_as_png_2x" type="submit" title="PNG image file: default size" onclick="saveDiagramAsPNG(2); return false;"><strong>Save as a .PNG image</strong></button>
+                <span class="toggleable" onclick="togglePanel('png_size_options');" title="Select to choose another resolution">
+                  <span id="png_size_options_indicator" class="indicator1">+</span>
+                  <small>more</small><span id="png_size_options_hint">...</span>
+                </span>
+                <span id="png_size_options" style="display: none;">
+                  <button id="save_as_png_4x" type="submit" title="PNG image file: Large (4x)" onclick="saveDiagramAsPNG(4); return false;"><strong>Large</strong> (4x)</button>
+                  <button id="save_as_png_6x" type="submit" title="PNG image file: Huge (6x)" onclick="saveDiagramAsPNG(6); return false;"><strong>Huge</strong> (6x)</button>
+                  <button id="save_as_png_1x" type="submit" title="PNG image file: Tiny (1x)" onclick="saveDiagramAsPNG(1); return false;"><strong>Tiny</strong> (1x)</button>
+                </span>
+                <span class="padded-inline">or</span>
+                <button id="save_as_svg" type="submit" title="Save this diagram as a Scalable Vector Graphics file" onclick="saveDiagramAsSVG(); return false;"><strong>Download .SVG</strong></button>
+              </p>
+            </div>
+          </div>
+
+          <div class="diagram_size expandable_box">
+            <h2 class="ui_head" onclick="togglePanel('diagram_options');">
+              <span id="diagram_options_indicator" class="indicator">&ndash;</span>
+              Diagram Size &amp; Background<span id="diagram_options_hint">:</span>
+            </h2>
+            <div id="diagram_options" class="form_chunk">
+              <p class="form_elements1">
+                <span class="no_wrap"><label for="size_w" title="Diagram Width in pixels"><strong>Width:</strong></label>
+                <input id="size_w" type="number" class="number_10000s" min="40" value="280" step="2" onchange="process_sankey();"></span>
+                <span class="no_wrap"><label for="size_h" class="spaced_label" title="Diagram Height in pixels"><strong>Height:</strong></label>
+                <input id="size_h" type="number" class="number_10000s" min="40" value="280" step="2" onchange="process_sankey();"></span>
+                <label for="bg_color" class="spaced_label"><strong>Background Color:</strong></label>
+                <input type="color" id="bg_color" size="7" maxlength="7" value="#FFFFFF" onchange="process_sankey();">
+                <input type="checkbox" id="bg_transparent" value="1" onchange="process_sankey();" class="spaced_checkbox"><label for="bg_transparent" class="ropt">Transparent</label><br />
+              </p>
+              <p class="form_elements2">
+                <strong>Margins:</strong>
+                <span class="no_wrap"><label for="margin_l" class="spaced_label">Left</label>
+                <input id="margin_l" type="number" class="number_100s" min="0" value="12" step="1" onchange="process_sankey();">
+                <label for="margin_r">Right</label>
+                <input id="margin_r" type="number" class="number_100s" min="0" value="12" step="1" onchange="process_sankey();"></span>
+                <span class="no_wrap"><label for="margin_t" class="spaced_label">Top</label>
+                <input id="margin_t" type="number" class="number_100s" min="0" value="18" step="1" onchange="process_sankey();">
+                <label for="margin_b">Bot</label>
+                <input id="margin_b" type="number" class="number_100s" min="0" value="20" step="1" onchange="process_sankey();"></span>
+              </p>
+            </div>
+          </div>
+
+          <div class="diagram_main">
+            <div id="top_messages_container">
+              <div id="info_messages"></div>
+              <div id="issue_messages"></div>
+            </div>
+            <p id="reset_moves_area" class="form_elements1">
+              Move Nodes by <em>dragging</em>. Double-click a Node to reset, or: <button type="button" id="reset_all_moved_nodes" onclick="resetMovesAndRender(); return false;">Reset all moved Nodes</button>
+            </p>
+            <p id="chart">
+              <svg id="svg_scratch" height="280" width="280" xmlns="http://www.w3.org/2000/svg" class="hidden_under"></svg>
+              <svg id="sankey_svg" height="280" width="280" xmlns="http://www.w3.org/2000/svg"></svg>
+            </p>
+            <canvas id="png_preview" height="280" width="280" style="background-color: transparent; display: none;"></canvas>
+            <div id="chartfooter">
+              <p class="form_elements1 text_center">
+                <input type="checkbox" id="meta_mentionsankeymatic" value="1" onchange="process_sankey();" checked>
+                <label class="smalllabel ropt" for="meta_mentionsankeymatic">Include &ldquo;Made at SankeyMATIC.com&rdquo;</label>
+              </p>
+            </div>
+          </div>
+
+          <div class="diagram_about">
+            <table id="messages" class="expandable_box">
+              <tr><td>
+                <div id="messages_area">
+                  <h4>About this diagram</h4>
+                  <div id="totals_area"></div>
+                </div>
+                <div id="console_area" style="display: none;">
+                  <details><summary>Console</summary>
+                    <div id="console_lines"></div>
+                  </details>
+                </div>
+              </td></tr>
+              <tr><td id="imbalances_area">
+                <div id="imbalance_control">
+                  <span class="underline"><strong><em>When Total Inputs &ne; Total Outputs:</em></strong></span><br>
+                  <p class="form_elements3">
+                    Attach incomplete flow groups to:<br>
+                    <span><input name="layout_attachincompletesto" id="layout_attachto_leading" value="leading" type="radio" onchange="process_sankey();" /><label for="layout_attachto_leading" class="ropt">The leading edge of the Node</label></span><br>
+                    <span><input name="layout_attachincompletesto" id="layout_attachto_trailing" value="trailing" type="radio" onchange="process_sankey();" /><label for="layout_attachto_trailing" class="ropt">The trailing edge of the Node</label></span><br>
+                    <span><input name="layout_attachincompletesto" id="layout_attachto_nearest" value="nearest" type="radio" onchange="process_sankey();" checked="checked" /><label for="layout_attachto_nearest" class="ropt">The edge nearest to the flow group's center</label></span>
+                  </p>
+                  <p class="lastrow">
+                    <input type="checkbox" id="meta_listimbalances" value="1" onchange="process_sankey();" checked="checked" />
+                    <label class="ropt" for="meta_listimbalances">List all imbalanced Nodes</label>
+                  </p>
+                  <div id="imbalance_messages"></div>
+                </div>
+              </td></tr>
+            </table>
+          </div>
+        </div>
+      </form>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvg@3/lib/umd.js"></script>
+  <script>
+    // constants.js
+    const MAXBREAKPOINT = 9999,
+          skmSettings = new Map([
+            ['size_w', ['whole', 600, [40]]],
+            ['size_h', ['whole', 600, [40]]],
+            ['margin_l', ['contained', 12, [0, 'w']]],
+            ['margin_r', ['contained', 12, [0, 'w']]],
+            ['margin_t', ['contained', 18, [0, 'h']]],
+            ['margin_b', ['contained', 20, [0, 'h']]],
+            ['bg_color', ['color', '#ffffff', []]],
+            ['bg_transparent', ['yn', 'n', []]],
+            ['node_w', ['contained', 9, [0, 'w']]],
+            ['node_h', ['half', 50, [0, 100]]],
+            ['node_spacing', ['half', 85, [0, 100]]],
+            ['node_border', ['contained', 0, [0, 'w']]],
+            ['node_theme', ['radio', 'none', ['a', 'b', 'c', 'd', 'none']]],
+            ['node_color', ['color', '#888888', []]],
+            ['node_opacity', ['decimal', 1.0, []]],
+            ['flow_curvature', ['decimal', 0.5, []]],
+            ['flow_inheritfrom', ['radio', 'none', ['source', 'target', 'outside-in', 'none']]],
+            ['flow_color', ['color', '#999999', []]],
+            ['flow_opacity', ['decimal', 0.45, []]],
+            ['layout_order', ['radio', 'automatic', ['automatic', 'exact']]],
+            ['layout_justifyorigins', ['yn', 'n', []]],
+            ['layout_justifyends', ['yn', 'n', []]],
+            ['layout_reversegraph', ['yn', 'n', []]],
+            ['layout_attachincompletesto', ['radio', 'nearest', ['leading', 'nearest', 'trailing']]],
+            ['labels_color', ['color', '#000000', []]],
+            ['labels_hide', ['yn', 'n', []]],
+            ['labels_highlight', ['decimal', 0.75, []]],
+            ['labels_fontface', ['radio', 'sans-serif', ['monospace', 'sans-serif', 'serif']]],
+            ['labels_linespacing', ['decimal', 0.15, []]],
+            ['labels_relativesize', ['whole', 100, [50, 150]]],
+            ['labels_magnify', ['whole', 100, [50, 150]]],
+            ['labelname_appears', ['yn', 'y', []]],
+            ['labelname_size', ['half', 16, [6]]],
+            ['labelname_weight', ['whole', 400, [100, 700]]],
+            ['labelvalue_appears', ['yn', 'y', []]],
+            ['labelvalue_fullprecision', ['yn', 'y', []]],
+            ['labelvalue_position', ['radio', 'below', ['above', 'before', 'after', 'below']]],
+            ['labelvalue_weight', ['whole', 400, [100, 700]]],
+            ['labelposition_autoalign', ['integer', 0, [-1, 1]]],
+            ['labelposition_scheme', ['radio', 'auto', ['auto', 'per_stage']]],
+            ['labelposition_first', ['radio', 'before', ['before', 'after']]],
+            ['labelposition_breakpoint', ['breakpoint', MAXBREAKPOINT, [2]]],
+            ['value_format', ['list', ',.', [',.', '.,', ' .', ' ,', 'X.', 'X,']]],
+            ['value_prefix', ['text', '', [0, 99]]],
+            ['value_suffix', ['text', '', [0, 99]]],
+            ['themeoffset_a', ['whole', 9, [0, 9]]],
+            ['themeoffset_b', ['whole', 0, [0, 9]]],
+            ['themeoffset_c', ['whole', 0, [0, 7]]],
+            ['themeoffset_d', ['whole', 0, [0, 11]]],
+            ['meta_mentionsankeymatic', ['yn', 'y', []]],
+            ['meta_listimbalances', ['yn', 'y', []]],
+            ['internal_iterations', ['whole', 25, [0, 50]]],
+            ['internal_revealshadows', ['yn', 'n', []]],
+          ]),
+          reWholeNumber = /^\d+$/,
+          reHalfNumber = /^\d+(?:\.5)?$/,
+          reInteger = /^-?\d+$/,
+          reDecimal = /^\d(?:.\d+)?$/,
+          reCommentLine = /^(?:'|\/\/)/,
+          reYesNo = /^(?:y|yes|n|no)/i,
+          reYes = /^(?:y|yes)/i,
+          reSettingsValue = /^((?:\w+\s*){1,2}) (#?[\w.-]+)$/,
+          reSettingsText = /^((?:\w+\s*){1,2}) '(.*)'$/,
+          reMoveLine = /^move (.+) (-?\d(?:.\d+)?), (-?\d(?:.\d+)?)$/,
+          sourceHeaderPrefix = '// SankeyMATIC diagram inputs -',
+          sourceURLLine = '// https://sankeymatic.com/build/',
+          userDataMarker = '// === Nodes and Flows ===',
+          movesMarker = '// === Moved Nodes ===',
+          settingsMarker = '// === Settings ===',
+          settingsAppliedPrefix = '// \u2713 ',
+          settingsToBackfill = `labelvalue position after
+labelposition scheme per_stage
+labels relativesize 100
+ magnify 100
+`,
+          reNodeLine = /^:(.+) #([a-f0-9]{0,6})?(\.\d{1,4})?\s*(>>|<<)*\s*(>>|<<)*$/i,
+          reFlowTargetWithSuffix = /^(.+)\s+(#\S+)$/,
+          reColorPlusOpacity = /^#([a-f0-9]{3,6})?(\.\d{1,4})?$/i,
+          reBareColor = /^(?:[a-f0-9]{3}|[a-f0-9]{6})$/i,
+          reRGBColor = /^#(?:[a-f0-9]{3}|[a-f0-9]{6})$/i,
+          colorGray60 = '#999',
+          userInputsField = 'flows_in',
+          breakpointField = 'labelposition_breakpoint',
+          [IN, OUT, BEFORE, AFTER] = [13, 17, 19, 23],
+          fontMetrics = {
+            firefox: {
+              'sans-serif': { dy: 0.35, top: 0.55, bot: 0.25, inner: 0.35, outer: 0.35, marginRight: 1.4, marginAdjLeft: 0, },
+              monospace: { dy: 0.31, top: 0.3, bot: 0.25, inner: 0.35, outer: 0.35, marginRight: 1.48, marginAdjLeft: -0.08, },
+              '*': { dy: 0.31, top: 0.3, bot: 0.25, inner: 0.35, outer: 0.35, marginRight: 1.35, marginAdjLeft: -0.05, },
+            },
+            '*': {
+              monospace: { dy: 0.28, top: 0.3, bot: 0.3, inner: 0.35, outer: 0.38, marginRight: 1.45, marginAdjLeft: 0, },
+              '*': { dy: 0.29, top: 0.3, bot: 0.3, inner: 0.35, outer: 0.38, marginRight: 1.35, marginAdjLeft: 0, },
+            },
+          },
+          highlightStyles = {
+            dark: { orig: { fill: '#fff', stroke: 'none', stroke_width: 0, stroke_opacity: 0 }, hover: { fill: '#ffb', stroke: '#440', stroke_width: 1, stroke_opacity: 0.7 }, },
+            light: { orig: { fill: '#000', stroke: 'none', stroke_width: 0, stroke_opacity: 0 }, hover: { fill: '#603', stroke: '#fff', stroke_width: 1.7, stroke_opacity: 0.9 }, },
+          },
+          sampleDiagramRecipes = new Map([
+            ['default_budget', { name: 'Basic Budget', flows: "// Enter Flows between Nodes, like this:\n//         Source [AMOUNT] Target\n\nWages [1500] Budget\nOther [250] Budget\n\nBudget [450] Taxes\nBudget [420] Housing\nBudget [400] Food\nBudget [255] Transportation\n\n// You can set a Node's color, like this:\n:Budget #057\n//            ...or a color for a single Flow:\nBudget [160] Other Necessities #606\n\n// \"[*]\" means \"Use any amount left over\":\nBudget [*] Savings\n\n// Use the controls below to customize\n// your diagram's appearance...", settings: { size_h: 600, size_w: 600, node_w: 12, node_h: 50, node_spacing: 75, node_border: 0, node_color: '#777777', node_theme: 'a', flow_inheritfrom: 'outside-in', layout_justifyends: 'n', layout_order: 'automatic', labelname_size: 16, labelname_weight: 400, labelposition_scheme: 'auto', labelposition_autoalign: 0, labels_highlight: 0.8, labels_magnify: 100, labels_relativesize: 110, labelvalue_appears: 'y', labelvalue_position: 'below', themeoffset_a: 6, value_prefix: '', }, }],
+            ['election', { name: 'Ranked Election', flows: '// Sample Ranked Election diagram\n\nGH\\nRound 1 [300000] GH\\nRound 2\nEF\\nRound 1 [220000] EF\\nRound 2\nCD\\nRound 1 [200000] CD\\nRound 2\nAB\\nRound 1 [10000] GH\\nRound 2\nAB\\nRound 1 [25000] EF\\nRound 2\nAB\\nRound 1 [20000] CD\\nRound 2\n\nGH\\nRound 2 [310000] GH\\nRound 3\\nProjected Winner\nEF\\nRound 2 [245000] EF\\nRound 3\nCD\\nRound 2 [50000] GH\\nRound 3\\nProjected Winner\nCD\\nRound 2 [95000] EF\\nRound 3\n\n// This line sets a custom gray color:\n:No further votes #555 <<\nCD\\nRound 2 [75000] No further votes\nAB\\nRound 1 [20000] No further votes', settings: { size_h: 600, size_w: 700, node_w: 10, node_h: 76, node_spacing: 85, node_border: 0, node_theme: 'a', flow_inheritfrom: 'source', layout_justifyends: 'n', layout_order: 'exact', labelname_size: 14, labelname_weight: 700, labelposition_scheme: 'auto', labelposition_autoalign: 0, labels_highlight: 0.8, labels_magnify: 105, labels_relativesize: 110, labelvalue_appears: 'y', labelvalue_position: 'below', themeoffset_a: 9, value_prefix: '', }, }],
+            ['job_search', { name: 'Job Search', flows: '// Sample Job Search diagram:\n\nApplications [4] 1st Interviews\nApplications [9] Rejected\nApplications [4] No Answer\n\n1st Interviews [2] 2nd Interviews\n1st Interviews [2] No Offer\n\n2nd Interviews [2] Offers\n\nOffers [1] Accepted\nOffers [1] Declined', settings: { size_h: 600, size_w: 700, node_w: 8, node_h: 60, node_spacing: 55, node_border: 0, node_theme: 'a', flow_inheritfrom: 'target', layout_justifyends: 'n', layout_order: 'automatic', labelname_size: 17, labelname_weight: 400, labelposition_scheme: 'auto', labelposition_autoalign: 1, labels_highlight: 0.55, labels_magnify: 95, labels_relativesize: 120, labelvalue_appears: 'y', labelvalue_position: 'above', themeoffset_a: 6, value_prefix: '', }, }],
+            ['financial_results', { name: 'Financial Results', flows: '// Sample Financial Results diagram:\n\nDivisionA [900] Revenue\nDivisionB [750] Revenue\nDivisionC [150] Revenue\n\nRevenue [800] Cost of Sales\nRevenue [1000] Gross Profit\n\nGross Profit [10] Amortization\nGross Profit [640] Selling, General &\\nAdministration\nGross Profit [350] Operating Profit\n\nOperating Profit [90] Tax\nOperating Profit [260] Net Profit\n\n// Profit - blue\n:Gross Profit #48e <<\n:Operating Profit #48e <<\n:Net Profit #48e <<\n\n// Expenses - rust\n:Tax #d97 <<\n:Selling, General &\\nAdministration #d97 <<\n:Amortization #d97 <<\n\n// Cost - gray\n:Cost of Sales #bbb <<\n\n// main Revenue node: dark grey\n:Revenue #555', settings: { size_h: 600, size_w: 900, node_w: 20, node_h: 75, node_spacing: 30, node_border: 2, node_theme: 'b', flow_inheritfrom: 'source', layout_justifyends: 'n', layout_order: 'automatic', labelname_size: 18, labelname_weight: 400, labelposition_scheme: 'auto', labelposition_autoalign: 0, labels_highlight: 0.8, labels_magnify: 113, labels_relativesize: 116, labelvalue_appears: 'y', labelvalue_position: 'below', themeoffset_b: 3, value_prefix: '$', }, }],
+            ['simple_start', { name: 'Start Simple', flows: 'a [1] b\na [1] c', settings: { size_h: 600, size_w: 600, node_w: 12, node_h: 50, node_spacing: 80, node_border: 0, node_theme: 'none', flow_inheritfrom: 'none', layout_justifyends: 'n', layout_order: 'automatic', labelname_size: 18, labelname_weight: 400, labelposition_scheme: 'auto', labelposition_autoalign: 0, labels_highlight: 0.75, labels_magnify: 100, labels_relativesize: 100, labelvalue_appears: 'y', labelvalue_position: 'after', value_prefix: '', }, }],
+            ['journey', { name: 'Journey', flows: '// List each player\'s moves all at once\n// Use one color for each player\n// Use an amount of 1 for each move\n// Check "Using the exact input order" below\n\n// Experiment with reordering players!\n\n:Player 1: #76a\nPlayer 1: [1] 1A #76a\n1A [1] 2C #76a\n2C [1] 3E #76a\n3E [1] Player 1 #76a\n:Player 1 #76a\n\n:Player 2: #e37\nPlayer 2: [1] 1B #e37\n1B [1] 2D #e37\n2D [1] 3E #e37\n3E [1] Player 2 #e37\n:Player 2 #e37\n\n:Player 3: #bb2\nPlayer 3: [1] 1A #bb2\n1A [1] 2D #bb2\n2D [1] 3E #bb2\n3E [1] Player 3 #bb2\n:Player 3 #bb2\n', settings: { size_h: 400, size_w: 600, node_w: 12, node_h: 23, node_spacing: 46, node_border: 0, node_theme: 'none', node_color: '#777777', flow_inheritfrom: 'outside-in', layout_justifyends: 'y', layout_order: 'exact', labelname_size: 16, labelname_weight: 400, labelposition_scheme: 'auto', labelposition_autoalign: 0, labels_highlight: 0.75, labels_magnify: 100, labels_relativesize: 100, labelvalue_appears: 'n', labelvalue_position: 'below', themeoffset_a: 9, value_prefix: '', }, }],
+          ]);
+  </script>
+  <script>
+    // sankey.js (d3-sankey logic)
+    d3.sankey = () => {
+      'use strict';
+      const sankey = {}, [SOURCES, TARGETS, TOP, BOTTOM, NEAREST] = [2, 3, 5, 7, 11];
+      let nodeWidth = 9, nodeHeightFactor = 0.5, nodeSpacingFactor = 0.85, size = { w: 1, h: 1 }, nodes = [], flows = [], rightJustifyEndpoints = false, leftJustifyOrigins = false, autoLayout = true, attachIncompletesTo = NEAREST, stagesArr = [], maximumNodeSpacing = 0, actualNodeSpacing = 0, maxStage = -1;
+      sankey.nodeWidth = function (x) { if (arguments.length) { nodeWidth = +x; return sankey; } return nodeWidth; };
+      sankey.nodeHeightFactor = function (x) { if (arguments.length) { nodeHeightFactor = +x; return sankey; } return nodeHeightFactor; };
+      sankey.nodeSpacingFactor = function (x) { if (arguments.length) { nodeSpacingFactor = +x; return sankey; } return nodeSpacingFactor; };
+      sankey.nodes = function (x) { if (arguments.length) { nodes = x; return sankey; } return nodes; };
+      sankey.flows = function (x) { if (arguments.length) { flows = x; return sankey; } return flows; };
+      sankey.size = function (x) { if (arguments.length) { size = x; return sankey; } return size; };
+      sankey.rightJustifyEndpoints = function (x) { if (arguments.length) { rightJustifyEndpoints = x; return sankey; } return rightJustifyEndpoints; };
+      sankey.leftJustifyOrigins = function (x) { if (arguments.length) { leftJustifyOrigins = x; return sankey; } return leftJustifyOrigins; };
+      sankey.autoLayout = function (x) { if (arguments.length) { autoLayout = x; return sankey; } return autoLayout; };
+      sankey.attachIncompletesTo = function (x) { if (arguments.length) { switch (x.toLowerCase()) { case 'leading': attachIncompletesTo = TOP; break; case 'trailing': attachIncompletesTo = BOTTOM; break; case 'nearest': attachIncompletesTo = NEAREST; break; } return sankey; } return attachIncompletesTo; };
+      sankey.stages = () => stagesArr;
+      function valueSum(list) { return d3.sum(list, (d) => d.value); }
+      function divide(a, b) { return a / (b || Number.MIN_VALUE); }
+      function yCenter(n) { return n.y + n.dy / 2; }
+      function yBottom(n) { return n.y + n.dy; }
+      function sourceTop(f) { return f.source.y + f.sy; }
+      function targetTop(f) { return f.target.y + f.ty; }
+      function sourceCenter(f) { return f.source.y + f.sy + (f.dy / 2); }
+      function targetCenter(f) { return f.target.y + f.ty + (f.dy / 2); }
+      function sourceBottom(f) { return f.source.y + f.sy + f.dy; }
+      function targetBottom(f) { return f.target.y + f.ty + f.dy; }
+      function leastY(nodeList) { return d3.min(nodeList, (n) => n.y); }
+      function greatestY(nodeList) { return d3.max(nodeList, (n) => yBottom(n)); }
+      function bySourceOrder(a, b) { return a.sourceRow - b.sourceRow; }
+      function byTopEdges(a, b) { return a.y - b.y; }
+      function connectFlowsToNodes() {
+        nodes.forEach((n) => { n.flows = { [IN]: [], [OUT]: [] }; n.isAShadow = false; });
+        flows.forEach((f) => {
+          if (typeof f.source === 'number') { f.source = nodes[f.source]; }
+          if (typeof f.target === 'number') { f.target = nodes[f.target]; }
+          f.source.flows[OUT].push(f); f.target.flows[IN].push(f); f.useForVisiblePlacing = true; f.isAShadow = false; f.hasAShadow = false;
+        });
+      }
+      function computeNodeValues() { nodes.forEach((n) => { n.total = { [IN]: valueSum(n.flows[IN]), [OUT]: valueSum(n.flows[OUT]) }; n.value = Math.max(n.total[IN], n.total[OUT], Number.MIN_VALUE); }); }
+      function allFlowStats(nodeList) {
+        function flowSetStats(whichFlows) {
+          const flowList = nodeList.map((n) => n.flows[whichFlows]).flat().filter((f) => f.weightedValue > 0);
+          if (flowList.length === 0) { return { value: 0, sources: { weight: 0 }, targets: { weight: 0 } }; }
+          return { value: d3.sum(flowList, (f) => f.weightedValue), sources: { weight: d3.sum(flowList, (f) => sourceCenter(f) * f.weightedValue), maxSourceStage: d3.max(flowList, (f) => f.source.stage), }, targets: { weight: d3.sum(flowList, (f) => targetCenter(f) * f.weightedValue), minTargetStage: d3.min(flowList, (f) => f.target.stage), }, };
+        }
+        return { [IN]: flowSetStats(IN), [OUT]: flowSetStats(OUT) };
+      }
+      function placeFlowsInsideNodes(nodeList) {
+        function sortFlows(n, placing) {
+          const dir = placing === TARGETS ? IN : OUT, fStats = allFlowStats([n]), [flowsToSort, totalFlowValue] = [n.flows[dir], n.total[dir]], totalFlowWeight = (dir === IN ? fStats[IN].sources : fStats[OUT].targets).weight, flowsRemaining = new Set(flowsToSort.map((f) => f.index)), totalFlowSpan = d3.sum(flowsToSort.filter((f) => !f.isAShadow || n.isAShadow), (f) => f.dy), flowPosition = totalFlowValue < n.value && (attachIncompletesTo === BOTTOM || (attachIncompletesTo === NEAREST && divide(totalFlowWeight, totalFlowValue) > yCenter(n))) ? BOTTOM : TOP, bounds = flowPosition === TOP ? { upper: n.y, lower: n.y + totalFlowSpan } : { upper: yBottom(n) - totalFlowSpan, lower: yBottom(n) };
+          function placeFlow(f, newTopY) { if (!flowsRemaining.has(f.index)) { return; } if (placing === TARGETS) { f.ty = newTopY - f.target.y; } else { f.sy = newTopY - f.source.y; } flowsRemaining.delete(f.index); }
+          function placeFlowAt(edge, fIndex) {
+            const f = flows[fIndex]; let newY = 0;
+            if (edge === TOP) { newY = bounds.upper; if (f.useForVisiblePlacing || n.isAShadow) { bounds.upper += f.dy; } } else { newY = bounds.lower - f.dy; if (f.useForVisiblePlacing || n.isAShadow) { bounds.lower = newY; } }
+            placeFlow(f, newY); if (f.useForVisiblePlacing && f.isAShadow) { placeFlow(flows[f.shadowOf], newY); }
+          }
+          const slopeData = { [TOP * TARGETS]: { f: (f) => (bounds.upper - sourceTop(f)) / f.dx, dir: -1 }, [TOP * SOURCES]: { f: (f) => (targetTop(f) - bounds.upper) / f.dx, dir: 1 }, [BOTTOM * TARGETS]: { f: (f) => (bounds.lower - sourceBottom(f)) / f.dx, dir: 1 }, [BOTTOM * SOURCES]: { f: (f) => (targetBottom(f) - bounds.lower) / f.dx, dir: -1 }, };
+          function placeUnhappiestFlowAt(edge) {
+            if (!flowsRemaining.size) { return; } const sKey = edge * placing, slopeOf = slopeData[sKey].f, flowIndex = Array.from(flowsRemaining).filter((i) => !flows[i].hasAShadow).sort((a, b) => (autoLayout ? (slopeData[sKey].dir * (slopeOf(flows[a]) - slopeOf(flows[b])) || flows[a].dx - flows[b].dx) : 0) || flows[a].sourceRow - flows[b].sourceRow)[0];
+            if (flowIndex !== undefined) { placeFlowAt(edge, flowIndex); }
+          }
+          while (flowsRemaining.size > 1) { placeUnhappiestFlowAt(TOP); if (autoLayout) { placeUnhappiestFlowAt(BOTTOM); } }
+          flowsRemaining.forEach((i) => placeFlowAt(TOP, i));
+        }
+        flows.forEach((f) => { f.dx = Math.abs(f.target.x - f.source.x) || Number.MIN_VALUE; });
+        const flowBatches = [...nodeList.filter((n) => n.flows[IN].length).map((n) => ({ i: n.index, len: n.flows[IN].length, placing: TARGETS })), ...nodeList.filter((n) => n.flows[OUT].length).map((n) => ({ i: n.index, len: n.flows[OUT].length, placing: SOURCES }))];
+        flowBatches.sort((a, b) => a.len - b.len).forEach((fBatch) => { sortFlows(nodes[fBatch.i], fBatch.placing); });
+      }
+      function assignNodesToStages() {
+        const nodesToCheckAgain = new Set(); function updateNode(n) { n.stage = maxStage; n.flows[OUT].forEach((f) => { nodesToCheckAgain.add(f.target); }); }
+        let nodesToPlace = nodes; while (nodesToPlace.length && maxStage < nodes.length - 1) { maxStage += 1; nodesToPlace.forEach((n) => updateNode(n)); nodesToPlace = Array.from(nodesToCheckAgain); nodesToCheckAgain.clear(); }
+        nodes.filter((n) => n.flows[OUT].length).slice().sort((a, b) => b.stage - a.stage).forEach((n) => { const maxNewStage = d3.min(n.flows[OUT], (f) => f.target.stage) - 1; if (n.stage < maxNewStage) { n.stage = maxNewStage; } });
+        function setStageWhenNoFlows(direction, newStage) { nodes.filter((n) => !n.flows[direction].length).forEach((n) => { n.stage = newStage; }); }
+        if (leftJustifyOrigins) { setStageWhenNoFlows(IN, 0); } if (rightJustifyEndpoints) { setStageWhenNoFlows(OUT, maxStage); }
+        flows.forEach((f) => { f.ds = f.target.stage - f.source.stage; });
+        const shadowNodeNames = new Map();
+        flows.filter((f) => Math.abs(f.ds) > 1).forEach((f) => {
+          const nodesForThisFlow = [f.source];
+          for (let i = 1; i < f.ds; i += 1) {
+            const shadowStage = f.source.stage + i, newNodeName = `sh_${f.source.index}_${f.target.index}_s${shadowStage}`, fVal = Number(f.value); let shadowNode;
+            if (shadowNodeNames.has(newNodeName)) { shadowNode = nodes[shadowNodeNames.get(newNodeName)]; shadowNode.value += fVal; shadowNode.total[IN] += fVal; shadowNode.total[OUT] += fVal; } else { shadowNode = { index: nodes.length, stage: shadowStage, name: newNodeName, sourceRow: f.sourceRow, isAShadow: true, flows: { [IN]: [], [OUT]: [] }, total: { [IN]: fVal, [OUT]: fVal }, value: fVal, }; nodes.push(shadowNode); shadowNodeNames.set(newNodeName, shadowNode.index); }
+            nodesForThisFlow.push(shadowNode);
+          }
+          nodesForThisFlow.push(f.target);
+          for (let i = 1; i < nodesForThisFlow.length; i += 1) {
+            const sourceNode = nodesForThisFlow[i - 1], targetNode = nodesForThisFlow[i], origSourceRow = Number(f.sourceRow), newFlow = { ...f, source: sourceNode, target: targetNode, index: flows.length, shadowOf: f.index, isAShadow: true, hasAShadow: false, sourceRow: origSourceRow + i / (f.ds + 1), useForVisiblePlacing: sourceNode.stage === f.source.stage || targetNode.stage === f.target.stage, };
+            flows.push(newFlow); newFlow.source.flows[OUT].push(newFlow); newFlow.target.flows[IN].push(newFlow);
+          }
+          f.useForVisiblePlacing = false; f.hasAShadow = true;
+        });
+      }
+      function updateStagesArray() { stagesArr = d3.groups(nodes, (d) => d.stage).sort((a, b) => a[0] - b[0]).map((d) => d[1].sort(bySourceOrder)); }
+      function placeNodes(iterations) {
+        function nodeSetStats(nodeList) { const weight = d3.sum(nodeList, (n) => yCenter(n) * n.value), value = valueSum(nodeList); return { stage: nodeList[0].stage, weight: weight, value: value, center: divide(weight, value), }; }
+        function initializeNodePositions() {
+          const greatestNodeCount = d3.max(stagesArr, (s) => s.length); let ky = 0;
+          if (greatestNodeCount === 1) { [maximumNodeSpacing, actualNodeSpacing] = [0, 0]; ky = nodeHeightFactor * d3.min(stagesArr, (s) => divide(size.h, valueSum(s))); } else { const allAvailablePadding = Math.max(2, size.h - greatestNodeCount); maximumNodeSpacing = ((1 - nodeHeightFactor) * allAvailablePadding) / (greatestNodeCount - 1); actualNodeSpacing = maximumNodeSpacing * nodeSpacingFactor; ky = d3.min(stagesArr, (s) => divide(size.h - (s.length - 1) * maximumNodeSpacing, valueSum(s))); }
+          if (ky === Infinity) { ky = 1; }
+          flows.forEach((f) => { f.dy = f.value * ky; f.weightedValue = f.hasAShadow ? 0 : f.value; });
+          nodes.forEach((n) => { n.dy = Math.max(n.value * ky, Number.MIN_VALUE); });
+          let targetY;
+          stagesArr.forEach((s, stageIndex) => {
+            const stageSize = (valueSum(s) * ky) + (actualNodeSpacing * (s.length - 1)); targetY = size.h / 2;
+            const allFlowsIn = s.map((n) => n.flows[IN]).flat();
+            if (allFlowsIn.length > 0) { const uniqueSourceNodes = new Set(allFlowsIn.map((f) => f.source).filter((n) => n.stage >= stageIndex - 1)); targetY = nodeSetStats(Array.from(uniqueSourceNodes)).center; }
+            let nextNodePos = Math.max(0, Math.min(targetY - (stageSize / 2), size.h - stageSize));
+            s.forEach((n) => { n.y = nextNodePos; nextNodePos = yBottom(n) + actualNodeSpacing; });
+          });
+          const widthPerStage = maxStage > 0 ? (size.w - nodeWidth) / maxStage : 0;
+          nodes.forEach((n) => { n.x = widthPerStage * n.stage; n.dx = nodeWidth; });
+          nodes.forEach((n) => {
+            let [sy, ty] = [0, 0];
+            n.flows[OUT].forEach((f) => { if (f.isAShadow && !n.isAShadow) { f.sy = flows[f.shadowOf].sy; } else { f.sy = sy; sy += f.dy; } });
+            n.flows[IN].forEach((f) => { if (f.isAShadow && !n.isAShadow) { f.ty = flows[f.shadowOf].ty; } else { f.ty = ty; ty += f.dy; } });
+          });
+        }
+        function findNodeGroupOffset(nodeList) {
+          const fStats = allFlowStats(nodeList), totalIn = fStats[IN].value, totalOut = fStats[OUT].value; if (totalIn === 0 && totalOut === 0) { return 0; }
+          const nStats = nodeSetStats(nodeList), projectedSourceCenter = divide(nStats.weight - fStats[IN].targets.weight + fStats[IN].sources.weight, nStats.value), projectedTargetCenter = divide(nStats.weight - fStats[OUT].sources.weight + fStats[OUT].targets.weight, nStats.value);
+          let goalY = 0;
+          if (totalOut === 0) { goalY = projectedSourceCenter; } else if (totalIn === 0) { goalY = projectedTargetCenter; } else { const startStage = fStats[IN].sources.maxSourceStage, endStage = fStats[OUT].targets.minTargetStage, stageDistance = endStage - startStage, slopeBetweenCenters = stageDistance !== 0 ? (projectedTargetCenter - projectedSourceCenter) / stageDistance : 0; goalY = projectedSourceCenter + (nStats.stage - startStage) * slopeBetweenCenters; }
+          return goalY - nStats.center;
+        }
+        function updateStageCentering(s) {
+          function enforceValidNodePositions() {
+            let yPos = 0; s.forEach((n) => { if (n.y < yPos) { n.y = yPos; } yPos = yBottom(n) + actualNodeSpacing; });
+            yPos = size.h; s.slice().reverse().forEach((n) => { if (yBottom(n) > yPos) { n.y = yPos - n.dy; } yPos = n.y - actualNodeSpacing; });
+          }
+          function nodesAreAdjacent(n1, n2) { return (n2.y - actualNodeSpacing - yBottom(n1)) < 0.1; }
+          function centerNeighborGroups() {
+            const neighborGroups = []; s.forEach((n, i) => { if (i > 0 && nodesAreAdjacent(s[i - 1], n)) { const lastGroup = neighborGroups.length - 1; neighborGroups[lastGroup].push(n); } else { neighborGroups.push([n]); } });
+            neighborGroups.filter((g) => g.length > 1).forEach((nodeGroup) => { const yOffset = findNodeGroupOffset(nodeGroup); nodeGroup.forEach((n) => { n.y += yOffset; }); });
+          }
+          s.sort(autoLayout ? byTopEdges : bySourceOrder); enforceValidNodePositions(); centerNeighborGroups(); enforceValidNodePositions(); centerNeighborGroups(); enforceValidNodePositions();
+        }
+        function processStages(stageList, factor) {
+          stageList.forEach((s) => { s.forEach((n) => { n.y += findNodeGroupOffset([n]) * factor; }); updateStageCentering(s); placeFlowsInsideNodes(s); });
+          placeFlowsInsideNodes(nodes);
+        }
+        function reCenterDiagram() { const minY = leastY(nodes), yH = greatestY(nodes) - minY; if (yH < size.h) { const yOffset = (size.h / 2) - (minY + (yH / 2)); nodes.forEach((n) => { n.y += yOffset; }); } }
+        initializeNodePositions(); stagesArr.forEach((s) => { updateStageCentering(s); }); placeFlowsInsideNodes(nodes);
+        let [alpha, counter] = [1, 0]; while (counter < iterations) { counter += 1; alpha *= 0.99; processStages(stagesArr, alpha); processStages(stagesArr.slice().reverse(), alpha); reCenterDiagram(); }
+        nodes.forEach((n) => { n.origPos = { x: n.x, y: n.y }; n.lastPos = { x: n.x, y: n.y }; n.move = [0, 0]; });
+      }
+      sankey.setup = () => { connectFlowsToNodes(); computeNodeValues(); assignNodesToStages(); updateStagesArray(); return sankey; };
+      sankey.layout = (iterations) => { updateStagesArray(); placeNodes(iterations); return sankey; };
+      sankey.relayout = () => { placeFlowsInsideNodes(nodes); return sankey; };
+      return sankey;
+    };
+  </script>
+  <script>
+    // lz-string.min.js
+    var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=",n="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+-$",e={};function t(r,o){if(!e[r]){e[r]={};for(var n=0;n<r.length;n++)e[r][r.charAt(n)]=n}return e[r][o]}var i={compressToBase64:function(r){if(null==r)return"";var n=i._compress(r,6,function(r){return o.charAt(r)});switch(n.length%4){default:case 0:return n;case 1:return n+"===";case 2:return n+"==";case 3:return n+"="}},decompressFromBase64:function(r){return null==r?"":""==r?null:i._decompress(r.length,32,function(n){return t(o,r.charAt(n))})},compressToUTF16:function(o){return null==o?"":i._compress(o,15,function(o){return r(o+32)})+" "},decompressFromUTF16:function(r){return null==r?"":""==r?null:i._decompress(r.length,16384,function(o){return r.charCodeAt(o)-32})},compressToUint8Array:function(r){for(var o=i.compress(r),n=new Uint8Array(2*o.length),e=0,t=o.length;e<t;e++){var s=o.charCodeAt(e);n[2*e]=s>>>8,n[2*e+1]=s%256}return n},decompressFromUint8Array:function(o){if(null==o)return i.decompress(o);for(var n=new Array(o.length/2),e=0,t=n.length;e<t;e++)n[e]=256*o[2*e]+o[2*e+1];var s=[];return n.forEach(function(o){s.push(r(o))}),i.decompress(s.join(""))},compressToEncodedURIComponent:function(r){return null==r?"":i._compress(r,6,function(r){return n.charAt(r)})},decompressFromEncodedURIComponent:function(r){return null==r?"":""==r?null:(r=r.replace(/ /g,"+"),i._decompress(r.length,32,function(o){return t(n,r.charAt(o))}))},compress:function(o){return i._compress(o,16,function(o){return r(o)})},_compress:function(r,o,n){if(null==r)return"";var e,t,i,s={},u={},a="",p="",c="",l=2,f=3,h=2,d=[],m=0,v=0;for(i=0;i<r.length;i+=1)if(a=r.charAt(i),Object.prototype.hasOwnProperty.call(s,a)||(s[a]=f++,u[a]=!0),p=c+a,Object.prototype.hasOwnProperty.call(s,p))c=p;else{if(Object.prototype.hasOwnProperty.call(u,c)){if(c.charCodeAt(0)<256){for(e=0;e<h;e++)m<<=1,v==o-1?(v=0,d.push(n(m)),m=0):v++;for(t=c.charCodeAt(0),e=0;e<8;e++)m=m<<1|1&t,v==o-1?(v=0,d.push(n(m)),m=0):v++,t>>=1}else{for(t=1,e=0;e<h;e++)m=m<<1|t,v==o-1?(v=0,d.push(n(m)),m=0):v++,t=0;for(t=c.charCodeAt(0),e=0;e<16;e++)m=m<<1|1&t,v==o-1?(v=0,d.push(n(m)),m=0):v++,t>>=1}0==--l&&(l=Math.pow(2,h),h++),delete u[c]}else for(t=s[c],e=0;e<h;e++)m=m<<1|1&t,v==o-1?(v=0,d.push(n(m)),m=0):v++,t>>=1;0==--l&&(l=Math.pow(2,h),h++),s[p]=f++,c=String(a)}if(""!==c){if(Object.prototype.hasOwnProperty.call(u,c)){if(c.charCodeAt(0)<256){for(e=0;e<h;e++)m<<=1,v==o-1?(v=0,d.push(n(m)),m=0):v++;for(t=c.charCodeAt(0),e=0;e<8;e++)m=m<<1|1&t,v==o-1?(v=0,d.push(n(m)),m=0):v++,t>>=1}else{for(t=1,e=0;e<h;e++)m=m<<1|t,v==o-1?(v=0,d.push(n(m)),m=0):v++,t=0;for(t=c.charCodeAt(0),e=0;e<16;e++)m=m<<1|1&t,v==o-1?(v=0,d.push(n(m)),m=0):v++,t>>=1}0==--l&&(l=Math.pow(2,h),h++),delete u[c]}else for(t=s[c],e=0;e<h;e++)m=m<<1|1&t,v==o-1?(v=0,d.push(n(m)),m=0):v++,t>>=1;0==--l&&(l=Math.pow(2,h),h++)}for(t=2,e=0;e<h;e++)m=m<<1|1&t,v==o-1?(v=0,d.push(n(m)),m=0):v++,t>>=1;for(;;){if(m<<=1,v==o-1){d.push(n(m));break}v++}return d.join("")},decompress:function(r){return null==r?"":""==r?null:i._decompress(r.length,32768,function(o){return r.charCodeAt(o)})},_decompress:function(o,n,e){var t,i,s,u,a,p,c,l=[],f=4,h=4,d=3,m="",v=[],g={val:e(0),position:n,index:1};for(t=0;t<3;t+=1)l[t]=t;for(s=0,a=Math.pow(2,2),p=1;p!=a;)u=g.val&g.position,g.position>>=1,0==g.position&&(g.position=n,g.val=e(g.index++)),s|=(u>0?1:0)*p,p<<=1;switch(s){case 0:for(s=0,a=Math.pow(2,8),p=1;p!=a;)u=g.val&g.position,g.position>>=1,0==g.position&&(g.position=n,g.val=e(g.index++)),s|=(u>0?1:0)*p,p<<=1;c=r(s);break;case 1:for(s=0,a=Math.pow(2,16),p=1;p!=a;)u=g.val&g.position,g.position>>=1,0==g.position&&(g.position=n,g.val=e(g.index++)),s|=(u>0?1:0)*p,p<<=1;c=r(s);break;case 2:return""}for(l[3]=c,i=c,v.push(c);;){if(g.index>o)return"";for(s=0,a=Math.pow(2,d),p=1;p!=a;)u=g.val&g.position,g.position>>=1,0==g.position&&(g.position=n,g.val=e(g.index++)),s|=(u>0?1:0)*p,p<<=1;switch(c=s){case 0:for(s=0,a=Math.pow(2,8),p=1;p!=a;)u=g.val&g.position,g.position>>=1,0==g.position&&(g.position=n,g.val=e(g.index++)),s|=(u>0?1:0)*p,p<<=1;l[h++]=r(s),c=h-1,f--;break;case 1:for(s=0,a=Math.pow(2,16),p=1;p!=a;)u=g.val&g.position,g.position>>=1,0==g.position&&(g.position=n,g.val=e(g.index++)),s|=(u>0?1:0)*p,p<<=1;l[h++]=r(s),c=h-1,f--;break;case 2:return v.join("")}if(0==f&&(f=Math.pow(2,d),d++),l[c])m=l[c];else{if(c!==h)return null;m=i+i.charAt(0)}v.push(m),l[h++]=i+m.charAt(0),i=m,0==--f&&(f=Math.pow(2,d),d++)}}};return i}();
+  </script>
+  <script>
+    // sankeymatic.js (main application logic)
+    (function sankeymatic(glob) {
+    'use strict';
+    function el(domId) { return document.getElementById(domId); }
+    function elV(domId) { return document.getElementById(domId).value; }
+    glob.togglePanel = (panel) => {
+      const panelEl = el(panel), displayStyle = panelEl.tagName === 'SPAN' ? 'inline' : '', newVals = panelEl.style.display === 'none' ? { display: displayStyle, suffix: ':', action: String.fromCharCode(8211) } : { display: 'none', suffix: '...', action: '+' };
+      panelEl.style.display = newVals.display; el(`${panel}_hint`).textContent = newVals.suffix; el(`${panel}_indicator`).textContent = newVals.action; return null;
+    };
+    function debounce(callbackFn, waitMilliseconds = 500) {
+      let timeoutID; const delayedFn = function (...params) { if (timeoutID !== undefined) { clearTimeout(timeoutID); } timeoutID = setTimeout(() => callbackFn(...params), waitMilliseconds); }; return delayedFn;
+    }
+    function outputFieldEl(fld) { return el(`${fld}_val`); }
+    glob.labelNeverBreakpoint = 9999;
+    glob.resetMaxBreakpoint = (newMax) => { const elBreakpointSlider = el(breakpointField); elBreakpointSlider.setAttribute('max', String(newMax)); glob.labelNeverBreakpoint = newMax; };
+    glob.updateOutput = (fld) => {
+      function padPercent(pct) { const pctS = String(pct); if (pctS.length === 3) { return `${pctS}%`; } return `<span class="invis">${'0'.repeat(3 - pctS.length)}</span>${pctS}%`; }
+      const fldVal = elV(fld), fldValAsNum = Number(fldVal), oEl = outputFieldEl(fld);
+      if (['labels_magnify', 'labels_relativesize'].includes(fld)) { if (fldValAsNum === 100) { oEl.textContent = 'Same size'; } else { oEl.innerHTML = `${padPercent(200 - fldValAsNum)} — ${padPercent(fldValAsNum)}`; } return null; }
+      const formats = { node_h: '%', node_spacing: '%', node_opacity: '.2', flow_curvature: '|', flow_opacity: '.2', labelname_weight: 'font', labels_highlight: '.2', labels_linespacing: '.2', labelposition_autoalign: 'align', labelposition_breakpoint: 'breakpoint', labelvalue_weight: 'font', }, alignLabels = new Map([[-1, 'Before'], [0, 'Centered'], [1, 'After']]), fontWeights = { 100: 'Light', 400: 'Normal', 700: 'Bold' };
+      switch (formats[fld]) {
+        case '|': if (fldValAsNum <= 0.1) { oEl.textContent = '0.00'; break; } // FALLS THROUGH
+        case '.2': oEl.textContent = d3.format('.2f')(fldValAsNum); break;
+        case '%': oEl.textContent = `${d3.format('.1f')(fldValAsNum)}%`; break;
+        case 'breakpoint': oEl.textContent = fldValAsNum === glob.labelNeverBreakpoint ? 'Never' : `Stage ${fldVal}`; break;
+        case 'font': oEl.textContent = fontWeights[fldValAsNum] ?? fldVal; break;
+        case 'align': oEl.textContent = alignLabels.get(fldValAsNum) ?? fldVal; break;
+        default: oEl.textContent = fldVal;
+      }
+      return null;
+    };
+    glob.revealVal = (fld) => { glob.updateOutput(fld); const cl = outputFieldEl(fld).classList; cl.remove('fade-init', 'fade-out'); cl.add('fade-in'); return null; };
+    glob.fadeVal = (fld) => { outputFieldEl(fld).classList.replace('fade-in', 'fade-out'); return null; };
+    function isNumeric(n) { return !Number.isNaN(n - parseFloat(n)); }
+    function clamp(n, min, max) { return isNumeric(n) ? Math.min(Math.max(Number(n), min), max) : min; }
+    function radioRef(rId) { return document.forms.skm_form.elements[rId]; }
+    glob.checkRadio = (id) => { el(id).checked = true; };
+    glob.newInputsImportedFrom = null;
+    function setUpNewInputs(newData, dataSource) { el(userInputsField).value = settingsToBackfill + newData; glob.resetMaxBreakpoint(MAXBREAKPOINT); glob.newInputsImportedFrom = dataSource; }
+    glob.rememberedMoves = new Map();
+    glob.resetMovesAndRender = () => { glob.rememberedMoves.clear(); glob.process_sankey(); return null; };
+    function updateResetNodesUI() { el('reset_all_moved_nodes').disabled = !glob.rememberedMoves.size; }
+    function contrasting_gray_color(hc) { const c = d3.rgb(hc), yiq = (c.r * 299 + c.g * 587 + c.b * 114) / 1000, gray = Math.floor(yiq > 164 ? (0.75 * yiq) - 64 : (0.30 * yiq) + 192); return d3.rgb(gray, gray, gray); }
+    function escapeHTML(unsafeString) { return unsafeString.replaceAll('→', '&#8594;').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#039;').replaceAll('\n', '<br />'); }
+    function ep(x) { return Number(x.toFixed(5)).toString(); }
+    function updateMarks(stringIn, numberMarks) { if (numberMarks.group === ',') { return stringIn; } return stringIn.replaceAll(',', '!').replaceAll('.', numberMarks.decimal).replaceAll('!', numberMarks.group); }
+    function formatUserData(numberIn, nStyle) { const nString = updateMarks(d3.format(`,.${nStyle.decimalPlaces}${nStyle.trimString}f`)(numberIn), nStyle.marks); return `${nStyle.prefix}${nString}${nStyle.suffix}`; }
+    function initializeDiagram(cfg) { const svgEl = el('sankey_svg'); svgEl.setAttribute('height', cfg.size_h); svgEl.setAttribute('width', cfg.size_w); svgEl.setAttribute('class', `svg_background_${cfg.bg_transparent ? 'transparent' : 'default'}`); svgEl.textContent = ''; }
+    const formatTimestamp = d3.timeFormat('%Y%m%d_%H%M%S'); glob.fileTimestamp = () => formatTimestamp(new Date()); glob.humanTimestamp = () => new Date().toLocaleString();
+    function scaledPNG(scale) {
+      const chartEl = el('chart'), orig = { w: chartEl.clientWidth, h: chartEl.clientHeight }, scaleFactor = clamp(scale, 1, 6), scaled = { w: orig.w * scaleFactor, h: orig.h * scaleFactor }, offset = { x: (scaled.w - orig.w) / (2 * scaleFactor), y: (scaled.h - orig.h) / (2 * scaleFactor), }, canvasEl = el('png_preview'), canvasContext = canvasEl.getContext('2d'), svgContent = (new XMLSerializer()).serializeToString(el('sankey_svg'));
+      canvasEl.width = scaled.w; canvasEl.height = scaled.h;
+      const canvgObj = canvg.Canvg.fromString(canvasContext, svgContent, { ignoreMouse: true, ignoreAnimation: true, ignoreDimensions: true, scaleWidth: scaled.w, scaleHeight: scaled.h, offsetX: offset.x, offsetY: offset.y, }); canvgObj.render();
+      return [scaled, canvasEl.toDataURL('image/png')];
+    }
+    function downloadADataURL(dataURL, name) { const newA = document.createElement('a'); newA.style.display = 'none'; newA.href = dataURL; newA.download = name; document.body.append(newA); newA.click(); newA.remove(); }
+    glob.saveDiagramAsPNG = (scale) => { const [size, pngURL] = scaledPNG(scale); downloadADataURL(pngURL, `sankeymatic_${glob.fileTimestamp()}_${size.w}x${size.h}.png`); };
+    function downloadATextFile(txt, name) { const textBlob = new Blob([txt], { type: 'text/plain' }), tempURL = URL.createObjectURL(textBlob); downloadADataURL(tempURL, name); URL.revokeObjectURL(tempURL); }
+    glob.saveDiagramAsSVG = () => { const svgForExport = el('sankey_svg').outerHTML.replace(' id="sankey_svg"', '').replace(/ class="svg_background_[a-z]+"/, '').replace(/>/, `>\r\n<title>Your Diagram Title</title>\r\n<!-- Generated with SankeyMATIC: ${glob.humanTimestamp()} -->\r\n`).replace(/><(g|\/g|path|text|rect)/g, '>\r\n<$1'); downloadATextFile(svgForExport, `sankeymatic_${glob.fileTimestamp()}.svg`); };
+    function flatFlowPathMaker(f) { const sx = f.source.x + f.source.dx, tx = f.target.x, syTop = f.source.y + f.sy, tyBot = f.target.y + f.ty + f.dy; f.renderAs = 'flat'; return `M${ep(sx)} ${ep(syTop)}v${ep(f.dy)}L${ep(tx)} ${ep(tyBot)}v${ep(-f.dy)}z`; }
+    function curvedFlowPathFunction(curvature) {
+      return (f) => {
+        const syC = f.source.y + f.sy + f.dy / 2, tyC = f.target.y + f.ty + f.dy / 2, sEnd = f.source.x + f.source.dx, tStart = f.target.x;
+        if (Math.abs(syC - tyC) < 2 || Math.abs(tStart - sEnd) < 12) { return flatFlowPathMaker(f); }
+        f.renderAs = 'curved'; const xinterpolate = d3.interpolateNumber(sEnd, tStart), xcp1 = xinterpolate(curvature), xcp2 = xinterpolate(1 - curvature); return `M${ep(sEnd)} ${ep(syC)}C${ep(xcp1)} ${ep(syC)} ${ep(xcp2)} ${ep(tyC)} ${ep(tStart)} ${ep(tyC)}`;
+      };
+    }
+    function settingIsValid(sData, hVal, cfg) {
+      const [dataType, defaultVal, allowList] = sData;
+      if (dataType === 'yn' && reYesNo.test(hVal)) { return [true, reYes.test(hVal)]; }
+      if (['radio', 'list'].includes(dataType) && allowList.includes(hVal)) { return [true, hVal]; }
+      if (dataType === 'color') { let rgb; if (reRGBColor.test(hVal)) { rgb = d3.rgb(hVal); } else if (reBareColor.test(hVal)) { rgb = d3.rgb(`#${hVal}`); } else { const namedRGB = d3.color(hVal); if (namedRGB) { rgb = namedRGB; } } if (rgb) { return [true, rgb.formatHex()]; } }
+      function valueInBounds(v, [min, max]) { return v >= min && (max === undefined || v <= max); }
+      if (dataType === 'text') { const unescapedVal = hVal.replaceAll("''", "'"); if (valueInBounds(unescapedVal.length, allowList)) { return [true, unescapedVal]; } }
+      const valAsNum = Number(hVal);
+      if (dataType === 'decimal' && reDecimal.test(hVal) && valueInBounds(valAsNum, [0, 1.0])) { return [true, valAsNum]; }
+      if (dataType === 'integer' && reInteger.test(hVal) && valueInBounds(valAsNum, allowList)) { return [true, valAsNum]; }
+      if (dataType === 'half' && reHalfNumber.test(hVal) && valueInBounds(valAsNum, allowList)) { return [true, valAsNum]; }
+      if (['whole', 'contained', 'breakpoint'].includes(dataType) && reWholeNumber.test(hVal)) { let [minV, maxV] = [0, 0]; switch (dataType) { case 'whole': [minV, maxV] = allowList; break; case 'contained': maxV = cfg[allowList[1]]; break; case 'breakpoint': maxV = defaultVal; break; } if (valueInBounds(valAsNum, [minV, maxV])) { return [true, valAsNum]; } }
+      return [false];
+    }
+    function setValueOnPage(sName, dataType, cVal) { switch (dataType) { case 'radio': radioRef(sName).value = cVal; break; case 'yn': el(sName).checked = cVal; break; default: el(sName).value = cVal; } }
+    function getHumanValueFromPage(fName, dataType) { switch (dataType) { case 'radio': return radioRef(fName).value; case 'color': return el(fName).value.toLowerCase(); case 'yn': return el(fName)?.checked ? 'Y' : 'N'; case 'list': case 'text': return el(fName).value; default: return Number(el(fName).value); } }
+    function settingHtoC(hVal, dataType) { switch (dataType) { case 'whole': case 'half': case 'decimal': case 'integer': case 'contained': case 'breakpoint': return Number(hVal); case 'yn': return reYes.test(hVal); default: return hVal; } }
+    const msg = {
+      areas: new Map([['issue', { id: 'issue_messages', class: 'errormessage' }], ['difference', { id: 'imbalance_messages', class: 'differencemessage' }], ['total', { id: 'totals_area', class: '' }], ['info', { id: 'info_messages', class: 'okmessage' }], ['console', { id: 'console_lines', class: '' }],]),
+      add: (msgHTML, msgArea = 'info') => { const msgData = msg.areas.get(msgArea) || msg.areas.get('info'), msgDiv = document.createElement('div'); msgDiv.innerHTML = msgHTML; if (msgData.class.length) { msgDiv.classList.add(msgData.class); } el(msgData.id).append(msgDiv); },
+      consoleContainer: el('console_area'), log: (msgHTML) => { msg.consoleContainer.style.display = ''; msg.add(msgHTML, 'console'); }, flagsSeen: new Set(), logOnce: (flag, msgHTML) => { if (msg.flagsSeen.has(flag)) { return; } msg.log(`<span class="info_text">${msgHTML}</span>`); msg.flagsSeen.add(flag); }, queue: [], addToQueue: (msgHTML, msgArea) => { msg.queue.push([msgHTML, msgArea]); },
+      resetAll: () => { Array.from(msg.areas.values()).map((a) => a.id).forEach((id) => { el(id).replaceChildren(); }); msg.consoleContainer.style.display = 'none'; msg.flagsSeen.clear(); },
+      showQueued: () => { while (msg.queue.length) { msg.add(...msg.queue.shift()); } },
+    };
+    function highlightSafeValue(userV) { return `&quot;<strong>${escapeHTML(userV)}</strong>&quot;`; }
+    glob.hideReplaceGraphWarning = () => { el('replace_graph_warning').style.display = 'none'; return null; };
+    glob.replaceGraphConfirmed = () => {
+      const graphName = elV('demo_graph_chosen'), savedRecipe = sampleDiagramRecipes.get(graphName);
+      glob.resetMaxBreakpoint(MAXBREAKPOINT); Object.entries(savedRecipe.settings).forEach(([fld, newVal]) => { const fldData = skmSettings.get(fld), [validSetting, finalValue] = settingIsValid(fldData, newVal, {}); if (validSetting) { setValueOnPage(fld, fldData[0], finalValue); } });
+      const flowsPanel = 'input_options'; if (el(flowsPanel).style.display === 'none') { glob.togglePanel(flowsPanel); }
+      const flowsEl = el(userInputsField); flowsEl.focus(); flowsEl.select(); flowsEl.setRangeText(savedRecipe.flows, 0, flowsEl.selectionEnd, 'start'); flowsEl.blur(); glob.hideReplaceGraphWarning(); glob.resetMovesAndRender(); return null;
+    };
+    glob.replaceGraph = (graphName) => {
+      const savedRecipe = sampleDiagramRecipes.get(graphName); if (!savedRecipe) { msg.add(`Requested sample diagram ${highlightSafeValue(graphName)} not found.`, 'issue'); return null; }
+      el('demo_graph_chosen').value = graphName; const userInputs = elV(userInputsField), inputsMatchAnySample = Array.from(sampleDiagramRecipes.values()).some((r) => r.flows === userInputs);
+      if (inputsMatchAnySample || userInputs === '') { glob.replaceGraphConfirmed(); } else { el('replace_graph_warning').style.display = ''; el('replace_graph_yes').textContent = `Yes, replace the graph with '${savedRecipe.name}'`; }
+      return null;
+    };
+    const colorThemes = new Map([['a', { colorset: d3.schemeCategory10, nickname: 'Categories', d3Name: 'Category10', }], ['b', { colorset: d3.schemeTableau10, nickname: 'Tableau10', d3Name: 'Tableau10', }], ['c', { colorset: d3.schemeDark2, nickname: 'Dark', d3Name: 'Dark2', }], ['d', { colorset: d3.schemeSet3, nickname: 'Varied', d3Name: 'Set3', }],]);
+    function approvedColorTheme(themeKey) { return colorThemes.get(themeKey.toLowerCase()) || { colorset: [], nickname: 'Invalid Theme', d3Name: '?' }; }
+    function rotateColors(colors, offset) { const goodOffset = clamp(offset, 0, colors.length); return colors.slice(goodOffset).concat(colors.slice(0, goodOffset)); }
+    function offsetField(key) { return `themeoffset_${key}`; }
+    glob.nudgeColorTheme = (themeKey, move) => { const themeOffsetEl = el(offsetField(themeKey)), currentOffset = (themeOffsetEl === null) ? 0 : themeOffsetEl.value, colorsInTheme = approvedColorTheme(themeKey).colorset.length, newOffset = (colorsInTheme + +currentOffset + +move) % colorsInTheme; themeOffsetEl.value = newOffset; el(`theme_${themeKey}_radio`).checked = true; glob.process_sankey(); return null; };
+    function render_sankey(allNodes, allFlows, cfg, numberStyle) {
+      function withUnits(n) { return formatUserData(n, numberStyle); }
+      const scratchRoot = d3.select('#svg_scratch').attr('height', cfg.size_h).attr('width', cfg.size_w).attr('text-anchor', 'middle').attr('opacity', '0').attr('font-family', cfg.labels_fontface).attr('font-size', `${ep(cfg.labelname_size)}px`); scratchRoot.selectAll('*').remove();
+      function addTSpans(d3selection, textObjs, origSize, origX) {
+        let prevLineMaxSize = origSize;
+        textObjs.forEach((tspan) => {
+          if (tspan.newLine) { const lineSpacing = (0.95 + cfg.labels_linespacing) * ((prevLineMaxSize + tspan.size * 3) / 4); d3selection.append('tspan').attr('x', ep(origX)).attr('dy', ep(lineSpacing)).attr('font-weight', tspan.weight).attr('font-size', `${ep(tspan.size)}px`).text(tspan.txt); prevLineMaxSize = tspan.size; } else { d3selection.append('tspan').attr('font-weight', tspan.weight).attr('font-size', `${ep(tspan.size)}px`).text(tspan.txt); prevLineMaxSize = Math.max(prevLineMaxSize, tspan.size); }
+        });
+      }
+      function measureSVGText(txtList, id) {
+        const firstEl = txtList[0], laterSpans = txtList.slice(1), firstNewLineIndex = laterSpans.findIndex((tspan) => tspan.newLine), line1Weight = firstEl.weight ?? cfg.labelname_weight;
+        let line1Suffixes = [], laterLines = [], line1Size = firstEl.size ?? cfg.labelname_size;
+        if (firstNewLineIndex === -1) { line1Suffixes = laterSpans; } else { line1Suffixes = laterSpans.slice(0, firstNewLineIndex); laterLines = laterSpans.slice(firstNewLineIndex); }
+        const txtId = `bb_${id}`, [xC, yC] = [cfg.size_w / 2, cfg.size_h / 2], textEl = scratchRoot.append('text').attr('id', txtId).attr('x', ep(xC)).attr('y', ep(yC)).attr('font-weight', line1Weight).attr('font-size', `${ep(line1Size)}px`).text(firstEl.txt);
+        if (line1Suffixes.length) { addTSpans(textEl, line1Suffixes, line1Size, xC); line1Size = Math.max(line1Size, ...line1Suffixes.map((s) => s.size)); }
+        const line1height = textEl.node().getBBox().height; if (laterLines.length) { addTSpans(textEl, laterLines, line1Size, xC); } const totalBB = textEl.node().getBBox();
+        return { h: totalBB.height, w: totalBB.width, line1h: line1height, };
+      }
+      function setUpTextDimensions() {
+        function isFirefox() { return navigator && /firefox/i.test(navigator.userAgent || navigator.vendor || ''); }
+        const emSize = measureSVGText([{ txt: 'm' }], 'em'), boundingBoxH = emSize.h, emW = emSize.w, exH = measureSVGText([{ txt: 'x' }], 'ex').w, browserKey = isFirefox() ? 'firefox' : '*', metrics = fontMetrics[browserKey][cfg.labels_fontface] || fontMetrics[browserKey]['*'], m = { dy: metrics.dy * boundingBoxH, top: metrics.top * exH, bot: metrics.bot * exH, inner: metrics.inner * emW, outer: metrics.outer * emW, dyFactor: metrics.dy, };
+        m.lblMarginAfter = (cfg.node_border / 2) + metrics.marginRight * m.inner; m.lblMarginBefore = (cfg.node_border / 2) + (metrics.marginRight + metrics.marginAdjLeft) * m.inner; return m;
+      }
+      const pad = setUpTextDimensions(), sankeyObj = d3.sankey().nodes(allNodes).flows(allFlows).rightJustifyEndpoints(cfg.layout_justifyends).leftJustifyOrigins(cfg.layout_justifyorigins).setup();
+      let stagesArr = sankeyObj.stages(); const newMax = stagesArr.length + 1, oldMax = glob.labelNeverBreakpoint;
+      if (newMax !== oldMax) { glob.resetMaxBreakpoint(newMax); if (cfg.labelposition_breakpoint > newMax || cfg.labelposition_breakpoint === oldMax) { el(breakpointField).value = newMax; cfg.labelposition_breakpoint = newMax; } }
+      function shadowFilter(i) { return !i.isAShadow || cfg.internal_revealshadows; }
+      if (cfg.internal_revealshadows) { allNodes.filter((n) => n.isAShadow).forEach((n) => { n.tipname = '(shadow)'; }); }
+      function getLabelPieces(n, magnification) {
+        const overallSize = cfg.labelname_size * magnification, relativeSizeAdjustment = (cfg.labels_relativesize - 100) / 100, nameSize = overallSize * (1 - relativeSizeAdjustment), valueSize = overallSize * (1 + relativeSizeAdjustment), nameParts = String(n.name).split('\\n'), nameObjs = nameParts.map((part, i) => ({ txt: part, weight: cfg.labelname_weight, size: nameSize, newLine: i > 0 || (cfg.labelvalue_appears && cfg.labelvalue_position === 'above'), })), valObj = { txt: withUnits(n.value), weight: cfg.labelvalue_weight, size: valueSize, newLine: (cfg.labelname_appears && cfg.labelvalue_position === 'below'), };
+        if (!cfg.labelvalue_appears) { return nameObjs; } if (!cfg.labelname_appears) { return [valObj]; }
+        switch (cfg.labelvalue_position) { case 'before': valObj.txt += ' '; // FALLS THROUGH
+          case 'above': return [valObj, ...nameObjs]; case 'after': nameObjs[nameObjs.length - 1].txt += ': '; // FALLS THROUGH
+          default: return [...nameObjs, valObj]; }
+      }
+      function labelAnchor(n) { if (cfg.labelposition_scheme === 'per_stage') { const bp = cfg.labelposition_breakpoint - 1, anchorAtEnd = cfg.labelposition_first === 'before' ? n.stage < bp : n.stage >= bp; return anchorAtEnd ? 'end' : 'start'; } if (!n.flows[IN].length) { return 'end'; } if (!n.flows[OUT].length) { return 'start'; } switch (cfg.labelposition_autoalign) { case -1: return 'end'; case 1: return 'start'; default: return 'middle'; } }
+      const [minVal, maxVal] = d3.extent(allNodes, (n) => n.value), nodeScaleFn = (v) => (minVal === maxVal ? 1 : (v - minVal) / (maxVal - minVal));
+      if (cfg.labelname_appears || cfg.labelvalue_appears) { allNodes.filter(shadowFilter).filter((n) => !n.hideLabel).forEach((n) => { const totalRange = (Math.abs(cfg.labels_magnify - 100) * 2) / 100, nFactor = nodeScaleFn(n.value), nAbsolutePos = cfg.labels_magnify >= 100 ? nFactor : 1 - nFactor, nodePositionInRange = nAbsolutePos * totalRange - totalRange / 2, magnifyLabel = cfg.labels_magnify === 100 ? 1 : 1 + nodePositionInRange, id = `label${n.index}`; n.labelList = getLabelPieces(n, magnifyLabel); n.label = { dom_id: id, anchor: labelAnchor(n), bb: measureSVGText(n.labelList, id), }; }); }
+      function maxLabelWidth(stageArr, labelsBefore) { let maxWidth = 0; stageArr.filter((n) => n.labelList?.length).forEach((n) => { const labelTotalW = n.label.bb.w + (labelsBefore ? pad.lblMarginBefore : pad.lblMarginAfter) + pad.outer; maxWidth = Math.max(maxWidth, labelTotalW); }); return maxWidth; }
+      function setUpDiagramSize() {
+        const graphW = cfg.size_w - cfg.margin_l - cfg.margin_r, graphH = cfg.size_h - cfg.margin_t - cfg.margin_b, lastStage = stagesArr.length - 1, labelsBeforeFirst = stagesArr[0].filter((n) => n.label?.anchor === 'end'), labelsAfterLast = stagesArr[lastStage].filter((n) => n.label?.anchor === 'start'), leadingW = labelsBeforeFirst.length > 0 ? maxLabelWidth(stagesArr[0], true) : cfg.node_border / 2, trailingW = labelsAfterLast.length > 0 ? maxLabelWidth(stagesArr[lastStage], false) : cfg.node_border / 2, idealW = graphW - leadingW - trailingW, minimumW = (stagesArr.length * cfg.node_w) + (lastStage * (cfg.node_border + 5)), finalW = Math.max(idealW, minimumW), leadingShareOfError = leadingW + trailingW > 0 ? (leadingW / (leadingW + trailingW)) : 0.5, leadingCutOffAdjustment = idealW < minimumW ? (idealW - minimumW) * leadingShareOfError : 0;
+        return { w: finalW, h: graphH, final_margin_l: cfg.margin_l + leadingW + leadingCutOffAdjustment, };
+      }
+      const graph = setUpDiagramSize();
+      sankeyObj.size({ w: graph.w, h: graph.h }).nodeWidth(cfg.node_w).nodeHeightFactor(cfg.node_h / 100).nodeSpacingFactor(cfg.node_spacing / 100).autoLayout(cfg.layout_order === 'automatic').attachIncompletesTo(cfg.layout_attachincompletesto).layout(cfg.internal_iterations);
+      stagesArr = sankeyObj.stages();
+      const userColorArray = cfg.node_theme === 'none' ? [cfg.node_color] : rotateColors(approvedColorTheme(cfg.node_theme).colorset, cfg[offsetField(cfg.node_theme)]), colorScaleFn = d3.scaleOrdinal(userColorArray), flowsAreFlat = (cfg.flow_curvature <= 0.1), flowPathFn = flowsAreFlat ? flatFlowPathMaker : curvedFlowPathFunction(cfg.flow_curvature), darkBg = (cfg.bg_color.toUpperCase() < '#888'), darkLabel = (cfg.labels_color.toUpperCase() < '#AAA'), hlStyle = highlightStyles[darkLabel ? 'dark' : 'light']; hlStyle.orig.fill_opacity = Number(cfg.labels_highlight); hlStyle.hover.fill_opacity = 0.666 + Number(cfg.labels_highlight) / 3;
+      function stagesMidpoint() { return (stagesArr.length - 1) / 2; }
+      allNodes.filter(shadowFilter).forEach((n) => {
+        n.dom_id = `r${n.index}`; n.css_class = `for_${n.dom_id}`; n.tooltip = `${n.tipname}:\n${withUnits(n.value)}`; n.opacity = n.opacity || cfg.node_opacity;
+        if (typeof n.color === 'undefined' || n.color === '') { const colorKeyString = (n.tipname?.match(/^\s*(\S+)/) || [null, 'name-is-blank'])[1]; n.color = n.isAShadow ? colorGray60 : colorScaleFn(colorKeyString); }
+        n.border_color = darkBg ? d3.rgb(n.color).brighter(2) : d3.rgb(n.color).darker(2);
+        if (n.labelList?.length && !n.hideLabel) { switch (n.label.anchor) { case 'start': n.label.x = n.x + n.dx + pad.lblMarginAfter; break; case 'end': n.label.x = n.x - pad.lblMarginBefore; break; default: n.label.x = n.x + n.dx / 2; } n.label.y = n.y + n.dy / 2; n.label.dy = pad.dyFactor * n.label.bb.line1h - (n.label.bb.h - n.label.bb.line1h) / 2; if (hlStyle.orig.fill_opacity > 0) { n.label.bg = { dom_id: `${n.label.dom_id}_bg`, offset: { x: n.label.anchor === 'end' ? -pad.outer : -pad.inner, y: -pad.top, w: pad.inner + pad.outer, h: pad.top + pad.bot, }, ...hlStyle.orig, }; } }
+      });
+      allFlows.filter(shadowFilter).forEach((f) => {
+        f.dom_id = `flow${f.index}`; f.tooltip = `${f.source.tipname} → ${f.target.tipname}: ${withUnits(f.value)}`; f.opacity = f.opacity || cfg.flow_opacity; f.opacity_on_hover = 0.5 + Number(f.opacity) / 2;
+        if (f.color === '') { if (f.isAShadow) { f.color = colorGray60; } else if (f.source.paint[AFTER]) { f.color = f.source.color; } else if (f.target.paint[BEFORE]) { f.color = f.target.color; } else { const flowMidpoint = (f.source.stage + f.target.stage) / 2; switch (cfg.flow_inheritfrom) { case 'source': f.color = f.source.color; break; case 'target': f.color = f.target.color; break; case 'outside-in': f.color = flowMidpoint <= stagesMidpoint() ? f.source.color : f.target.color; break; case 'none': f.color = cfg.flow_color; } } }
+        f.fill = { flat: f.color, curved: 'none' }; f.stroke_width = { flat: 0.5, curved: Math.max(1, f.dy) };
+      });
+      initializeDiagram(cfg); const diagramRoot = d3.select('#sankey_svg'); if (!cfg.bg_transparent) { diagramRoot.append('rect').attr('height', cfg.size_h).attr('width', cfg.size_w).attr('fill', cfg.bg_color); }
+      const diagMain = diagramRoot.append('g').attr('transform', `translate(${ep(graph.final_margin_l)},${ep(cfg.margin_t)})`);
+      function applyFlowEffects(f, o, s) { d3.select(`#${f.dom_id}`).attr('opacity', o); [f.source, f.target].filter((n) => n.label?.bg).forEach((n) => { d3.select(`#${n.label.bg.dom_id}`).attr('fill', s.fill).attr('fill-opacity', ep(s.fill_opacity)).attr('stroke', s.stroke).attr('stroke-width', ep(s.stroke_width)).attr('stroke-opacity', ep(s.stroke_opacity)); }); }
+      function turnOnFlowHoverEffects(_, f) { f.hovering = true; applyFlowEffects(f, f.opacity_on_hover, hlStyle.hover); }
+      function turnOffFlowHoverEffects(_, f) { applyFlowEffects(f, f.opacity, hlStyle.orig); f.hovering = false; }
+      const diagFlows = diagMain.append('g').attr('id', 'sankey_flows').selectAll().data(allFlows.filter(shadowFilter)).enter().append('path').attr('id', (f) => f.dom_id).attr('d', flowPathFn).attr('fill', (f) => f.fill[f.renderAs]).attr('stroke-width', (f) => ep(f.stroke_width[f.renderAs])).attr('stroke', (f) => f.color).attr('opacity', (f) => f.opacity).on('mouseover', turnOnFlowHoverEffects).on('mouseout', turnOffFlowHoverEffects).sort((a, b) => b.isAShadow - a.isAShadow || b.dy - a.dy);
+      diagFlows.append('title').text((f) => f.tooltip);
+      function isAZeroMove(a) { return a.every((m) => m === 0); }
+      function applyNodeMove(index) { const n = allNodes[index], myXMove = n.move[0] * (cfg.layout_reversegraph ? -1 : 1), availableW = graph.w - n.dx, availableH = graph.h - n.dy; n.x = Math.max(0, Math.min(availableW, n.origPos.x + availableW * myXMove)); n.y = Math.max(0, Math.min(availableH, n.origPos.y + availableH * n.move[1])); d3.selectAll(`#sankey_svg .${n.css_class}`).attr('transform', isAZeroMove(n.move) ? null : `translate(${ep(n.x - n.origPos.x)},${ep(n.y - n.origPos.y)})`); }
+      function updateLastNodePosition(n) { n.lastPos = { x: n.x, y: n.y }; }
+      function rememberNodeMove(n) { updateLastNodePosition(n); if (isAZeroMove(n.move)) { glob.rememberedMoves.delete(n.name); } else { glob.rememberedMoves.set(n.name, n.move); } updateResetNodesUI(); }
+      function reLayoutDiagram() { sankeyObj.relayout(); diagFlows.attr('d', flowPathFn).attr('fill', (f) => f.fill[f.renderAs]).attr('stroke-width', (f) => ep(f.stroke_width[f.renderAs])); }
+      function dragNodeStarted(event, n) { const grayColor = contrasting_gray_color(cfg.bg_color); let diagHelperLayer = diagMain.select('#helper_layer'); if (!diagHelperLayer.nodes.length) { diagHelperLayer = diagMain.insert('g', '#sankey_nodes').attr('id', 'helper_layer').attr('fill', grayColor).attr('fill-opacity', 0.5).attr('stroke', 'none'); } diagHelperLayer.append('path').attr('id', 'helper_lines').attr('d', `M0 ${ep(n.lastPos.y)} h${ep(graph.w)} m0 ${ep(n.dy)} H0M${ep(n.lastPos.x)} 0 v${ep(graph.h)} m${ep(n.dx)} 0 V0`).attr('stroke', grayColor).attr('stroke-width', 1).attr('stroke-dasharray', '1 3').attr('stroke-opacity', 0.7); diagHelperLayer.append('rect').attr('id', 'helper_original_rect').attr('x', ep(n.origPos.x)).attr('y', ep(n.origPos.y)).attr('height', ep(n.dy)).attr('width', ep(n.dx)).attr('fill', n.color).attr('fill-opacity', 0.3); if (!(event.sourceEvent && event.sourceEvent.shiftKey)) { const shiftHints = diagHelperLayer.append('g').attr('id', 'helper_shift_hints').attr('font-size', '14px').attr('font-weight', '400'), hintHeights = graph.h > 350 ? [0.05, 0.95] : [0.4]; hintHeights.forEach((h) => { shiftHints.append('text').attr('text-anchor', 'middle').attr('x', graph.w / 2).attr('y', graph.h * h).text('Hold down Shift to move in only one direction'); }); } return null; }
+      function draggingNode(event, n) { let myX = event.x, myY = event.y; const graphIsReversed = el('layout_reversegraph').checked; if (event.sourceEvent && event.sourceEvent.shiftKey) { if (Math.abs(myX - n.lastPos.x) > Math.abs(myY - n.lastPos.y)) { myY = n.lastPos.y; } else { myX = n.lastPos.x; } const shiftHint = diagMain.select('#helper_shift_hints'); if (shiftHint.nodes) { shiftHint.remove(); } } n.move = [(graphIsReversed ? -1 : 1) * ((myX - n.origPos.x) / (graph.w - n.dx)), (graph.h === n.dy) ? 0 : (myY - n.origPos.y) / (graph.h - n.dy),]; applyNodeMove(n.index); reLayoutDiagram(); return null; }
+      function dragNodeEnded(event, n) { const helperLayer = diagMain.select('#helper_layer'); if (helperLayer.nodes) { helperLayer.remove(); } rememberNodeMove(n); allFlows.filter((f) => f.hovering).forEach((f) => { turnOffFlowHoverEffects(null, f); }); reLayoutDiagram(); return null; }
+      function doubleClickNode(event, n) { n.move = [0, 0]; applyNodeMove(n.index); rememberNodeMove(n); reLayoutDiagram(); return null; }
+      const diagNodes = diagMain.append('g').attr('id', 'sankey_nodes').selectAll('.node').data(allNodes.filter(shadowFilter)).enter().append('g').attr('class', 'node').call(d3.drag().on('start', dragNodeStarted).on('drag', draggingNode).on('end', dragNodeEnded)).on('dblclick', doubleClickNode);
+      if (cfg.node_border) { diagNodes.append('rect').attr('id', (n) => `${n.dom_id}_border`).attr('class', (n) => n.css_class).attr('x', (n) => ep(n.x)).attr('y', (n) => ep(n.y)).attr('height', (n) => ep(n.dy)).attr('width', (n) => ep(n.dx)).attr('stroke', (n) => n.border_color).attr('stroke-width', cfg.node_border).attr('fill', 'none'); }
+      diagNodes.append('rect').attr('id', (n) => n.dom_id).attr('class', (n) => n.css_class).attr('x', (n) => ep(n.x)).attr('y', (n) => ep(n.y)).attr('height', (n) => ep(n.dy)).attr('width', (n) => ep(n.dx)).attr('fill', (n) => n.color).attr('fill-opacity', (n) => n.opacity).append('title').text((n) => n.tooltip);
+      const diagLabels = diagMain.append('g').attr('id', 'sankey_labels').attr('font-family', cfg.labels_fontface).attr('font-size', `${ep(cfg.labelname_size)}px`).attr('fill', cfg.labels_color);
+      if (cfg.meta_mentionsankeymatic) { const mSize = Math.max(12, cfg.labelname_size / 2, Math.cbrt(graph.h) + 3), mMargin = Math.round(mSize / 2) - 1, mColor = cfg.bg_color === '#ffffff' ? '#336781' : contrasting_gray_color(cfg.bg_color); diagLabels.append('text').attr('text-anchor', 'middle').attr('x', ep(cfg.size_w / 2 - graph.final_margin_l)).attr('y', ep(graph.h + cfg.margin_b - mMargin)).attr('font-size', `${ep(mSize)}px`).attr('font-weight', '400').attr('fill', mColor).text('Made at SankeyMATIC.com'); }
+      if (!cfg.labels_hide && (cfg.labelname_appears || cfg.labelvalue_appears)) { diagLabels.selectAll().data(allNodes.filter(shadowFilter)).enter().filter((n) => !n.hideLabel).append('text').attr('id', (n) => n.label.dom_id).attr('class', (n) => n.css_class).attr('text-anchor', (n) => n.label.anchor).attr('x', (n) => ep(n.label.x)).attr('y', (n) => ep(n.label.y)).attr('font-weight', (n) => n.labelList[0].weight).attr('font-size', (n) => `${ep(n.labelList[0].size)}px`).attr('dy', (n) => ep(n.label.dy)).text((n) => n.labelList[0].txt).filter((n) => n.labelList.length > 1).each(function handleSpans(n) { addTSpans(d3.select(this), n.labelList.slice(1), n.labelList[0].size, n.label.x); }); allNodes.filter(shadowFilter).filter((n) => n.label?.bg).forEach((n) => { const labelTextSelector = `#${n.label.dom_id}`, labelBB = diagLabels.select(labelTextSelector).node().getBBox(), bg = n.label.bg; diagLabels.insert('rect', labelTextSelector).attr('id', bg.dom_id).attr('class', n.css_class).attr('x', ep(labelBB.x + bg.offset.x)).attr('y', ep(labelBB.y + bg.offset.y)).attr('width', ep(labelBB.width + bg.offset.w)).attr('height', ep(labelBB.height + bg.offset.h)).attr('rx', ep(cfg.labelname_size / 4)).attr('fill', bg.fill).attr('fill-opacity', ep(bg.fill_opacity)).attr('stroke', bg.stroke).attr('stroke-width', ep(bg.stroke_width)).attr('stroke-opacity', ep(bg.stroke_opacity)); }); }
+      if (glob.rememberedMoves.size) { const movedNodes = new Set(glob.rememberedMoves.keys()); allNodes.filter(shadowFilter).filter((n) => movedNodes.has(n.name)).forEach((n) => { n.move = glob.rememberedMoves.get(n.name); applyNodeMove(n.index); updateLastNodePosition(n); movedNodes.delete(n.name); }); movedNodes.forEach((nodeName) => { glob.rememberedMoves.delete(nodeName); }); reLayoutDiagram(); }
+    }
+    function removeAutoLines(lines) { return lines.filter((l) => !(l.startsWith(sourceHeaderPrefix) || l.startsWith(settingsAppliedPrefix) || [settingsMarker, userDataMarker, sourceURLLine, movesMarker].includes(l))).join('\n').replace(/^\n+/, '').replace(/\n+$/, ''); }
+    function getDiagramDefinition(verbose) {
+      const outputLines = [], customOutputFns = new Map([['list', (v) => `'${v}'`], ['text', (v) => `'${v.replaceAll("'", "''")}'`],]); let currentSettingGroup = '';
+      function outputFldName(fld) { const prefixLen = currentSettingGroup.length, shortFldName = prefixLen && fld.startsWith(`${currentSettingGroup}_`) ? `  ${fld.substring(prefixLen + 1)}` : fld; return shortFldName.replaceAll('_', ' '); }
+      function add(...lines) { outputLines.push(...lines); } function addIfV(...lines) { if (verbose) { add(...lines); } }
+      addIfV(`${sourceHeaderPrefix} Saved: ${glob.humanTimestamp()}`, sourceURLLine, '', userDataMarker, ''); add(removeAutoLines(elV(userInputsField).split('\n'))); addIfV('', settingsMarker, '');
+      skmSettings.forEach((fldData, fldName) => { if (fldName.startsWith('internal_')) { return; } const dataType = fldData[0], activeHVal = getHumanValueFromPage(fldName, dataType), outVal = customOutputFns.has(dataType) ? customOutputFns.get(dataType)(activeHVal) : activeHVal; add(`${outputFldName(fldName)} ${outVal}`); currentSettingGroup = fldName.split('_')[0]; });
+      if (glob.rememberedMoves.size) { addIfV('', movesMarker, ''); glob.rememberedMoves.forEach((move, nodeName) => { add(`move ${nodeName} ${ep(move[0])}, ${ep(move[1])}`); }); }
+      return outputLines.join('\n');
+    }
+    const urlInputsParam = 'i', linkTargetDiv = 'generatedLink', copiedMsgId = 'copiedMsg';
+    function generateLink() { const minDiagramDef = getDiagramDefinition(false), compressed = LZString.compressToEncodedURIComponent(minDiagramDef), currentUrl = new URL(glob.location.href); currentUrl.search = `${urlInputsParam}=${encodeURIComponent(compressed).replaceAll('-', '%2D')}`; return currentUrl; }
+    glob.saveDiagramToFile = () => { const verboseDiagramDef = getDiagramDefinition(true); downloadATextFile(verboseDiagramDef, `sankeymatic_${glob.fileTimestamp()}_source.txt`); };
+    glob.loadDiagramFile = async () => { const fileList = el('load_diagram_from_file').files; if (fileList.length === 0) { return; } const uploadedText = await fileList[0].text(), userFileName = fileList[0].name; setUpNewInputs(uploadedText, highlightSafeValue(userFileName)); glob.process_sankey(); };
+    glob.closeDialog = (dId) => { const dEl = el(`${dId}Dialog`); if (dEl) { dEl.close(); } };
+    glob.openGetLinkDialog = () => { const dEl = el('getLinkDialog'); if (dEl) { dEl.showModal(); const diagramUrl = generateLink(), tEl = el(linkTargetDiv); tEl.innerText = diagramUrl.toString(); tEl.focus(); } };
+    glob.copyGeneratedLink = () => { if (glob.navigator?.clipboard) { glob.navigator.clipboard.writeText(el(linkTargetDiv).innerText); el(copiedMsgId).innerText = 'Copied!'; setTimeout(() => { el(copiedMsgId).innerText = ''; }, 2000); } };
+    function loadFromQueryString() { const searchString = glob.location?.search; if (searchString) { const compressedInputs = new URLSearchParams(searchString)?.get(urlInputsParam); if (compressedInputs) { const expandedInputs = LZString.decompressFromEncodedURIComponent(compressedInputs); if (expandedInputs) { setUpNewInputs(expandedInputs, 'URL'); } else { msg.addToQueue(`The input string provided in the URL (${highlightSafeValue(`${compressedInputs.substring(0, 8)}...`)}) was not decodable.`, 'issue'); } } } }
+    glob.process_sankey = () => {
+      let [maxDecimalPlaces, maxNodeIndex, maxNodeVal] = [0, 0, 0]; const uniqueNodes = new Map();
+      function updateColorThemeDisplay() { const makeSpanTag = (color, count, themeName) => `<span style="background-color: ${color};" class="color_sample_${count}" title="${color} from d3 color scheme ${themeName}">&nbsp;</span>`; for (const t of colorThemes.keys()) { const theme = approvedColorTheme(t), themeOffset = elV(offsetField(t)), colorset = rotateColors(theme.colorset, themeOffset), renderedGuide = colorset.map((c) => makeSpanTag(c, colorset.length, theme.d3Name)).join(''); el(`theme_${t}_guide`).innerHTML = renderedGuide; el(`theme_${t}_label`).textContent = theme.nickname; } }
+      function parseNodeName(rawName) { const hiddenNameMatches = rawName.match(/^-(.*)-$/), hideThisLabel = hiddenNameMatches !== null, trueName = hideThisLabel ? hiddenNameMatches[1] : rawName; return { trueName: trueName, hideLabel: hideThisLabel }; }
+      function setUpNode(nodeName, row) { const { trueName, hideLabel } = parseNodeName(nodeName), thisNode = uniqueNodes.get(trueName); if (thisNode) { if (thisNode.sourceRow > row) { thisNode.sourceRow = row; } thisNode.hideLabel ||= hideLabel; return thisNode; } const newNode = { name: trueName, tipname: trueName.replaceAll('\\n', ' '), hideLabel: hideLabel, sourceRow: row, paintInputs: [], unknowns: { [IN]: new Set(), [OUT]: new Set() }, }; uniqueNodes.set(trueName, newNode); return newNode; }
+      function updateNodeAttrs(nodeParams) { const thisNode = setUpNode(nodeParams.name, nodeParams.sourceRow); delete nodeParams.sourceRow; if (reBareColor.test(nodeParams.color)) { nodeParams.color = `#${nodeParams.color}`; } delete nodeParams.name; Object.entries(nodeParams).forEach(([pName, pVal]) => { if (typeof pVal !== 'undefined' && pVal !== null && pVal !== '') { thisNode[pName] = pVal; } }); }
+      msg.resetAll(); msg.showQueued();
+      const origSourceLines = elV(userInputsField).split('\n'), sourceLines = origSourceLines.map((l) => l.trim().replace(/^\u200B+/, '').replace(/\u200B+$/, '').trim()), invalidLines = [], linesWithSettings = new Set(), linesWithValidSettings = new Set();
+      function warnAbout(line, warnMsg) { invalidLines.push({ value: line, message: warnMsg }); }
+      let currentSettingGroup = '';
+      sourceLines.forEach((lineIn, row) => {
+        const moveParts = lineIn.match(reMoveLine); if (moveParts !== null) { linesWithSettings.add(row); const [nodeName, moveX, moveY] = moveParts.slice(-3); glob.rememberedMoves.set(nodeName, [Number(moveX), Number(moveY)]); linesWithValidSettings.add(row); return; }
+        const settingParts = lineIn.match(reSettingsValue) ?? lineIn.match(reSettingsText);
+        if (settingParts !== null) {
+          linesWithSettings.add(row); let origSettingName = settingParts[1], settingName = origSettingName.replace(/\s+/g, '_');
+          'width height left right top bottom'.split(' ').filter((l) => settingName.endsWith(l)).forEach((long) => { settingName = settingName.replace(long, long[0]); });
+          if (!skmSettings.has(settingName) && !/_/.test(settingName) && currentSettingGroup.length) { settingName = `${currentSettingGroup}_${settingName}`; origSettingName = `${currentSettingGroup} ${origSettingName}`; }
+          currentSettingGroup = settingName.split('_')[0]; const settingData = skmSettings.get(settingName);
+          if (settingData) { const settingValue = settingParts[2], dataType = settingData[0], sizeObj = dataType === 'contained' ? { w: elV('size_w'), h: elV('size_h') } : {}, [validValue, finalValue] = settingIsValid(settingData, settingValue, sizeObj); if (validValue) { setValueOnPage(settingName, dataType, finalValue); linesWithValidSettings.add(row); return; } warnAbout(settingValue, `Invalid value for <strong>${origSettingName}<strong>`); } else { warnAbout(origSettingName, 'Not a valid setting name'); }
+        }
+      });
+      const goodFlows = [], approvedNodes = [], approvedFlows = [], SYM_USE_REMAINDER = '*', SYM_FILL_MISSING = '?', reFlowLine = new RegExp(`^(?<sourceNode>.+)\\[(?<amount>[\\d\\s.+-]+|\\${SYM_USE_REMAINDER}|\\${SYM_FILL_MISSING}|)\\](?<targetNodePlus>.+)$`);
+      function flowIsCalculated(fv) { return [SYM_USE_REMAINDER, SYM_FILL_MISSING].includes(fv); }
+      sourceLines.filter((l, i) => !linesWithSettings.has(i)).forEach((lineIn, row) => {
+        if (lineIn === '' || reCommentLine.test(lineIn)) { return; } let matches = lineIn.match(reNodeLine);
+        if (matches !== null) { updateNodeAttrs({ name: matches[1].trim(), color: matches[2], opacity: matches[3], paintInputs: [matches[4], matches[5]], sourceRow: row, }); return; }
+        matches = lineIn.match(reFlowLine);
+        if (matches !== null) {
+          const amountIn = matches[2].replace(/\s/g, ''), isCalculated = flowIsCalculated(amountIn); if (amountIn === '') { msg.log(`<span class="info_text">Skipped empty flow:</span> ${escapeHTML(lineIn)}`); return; }
+          if (!isNumeric(amountIn) && !isCalculated) { warnAbout(lineIn, `The [Amount] must be a number in the form #.# or a wildcard ("${SYM_USE_REMAINDER}" or "${SYM_FILL_MISSING}").`); return; }
+          if (Number(amountIn) < 0) { warnAbout(lineIn, 'Amounts must not be negative'); return; }
+          goodFlows.push({ source: matches[1].trim(), target: matches[3].trim(), amount: amountIn, sourceRow: row, operation: isCalculated ? amountIn : null, }); maxDecimalPlaces = Math.max(maxDecimalPlaces, (amountIn.split('.')[1] || '').length); return;
+        }
+        warnAbout(lineIn, 'Does not match the format of a Flow or Node or Setting');
+      });
+      invalidLines.forEach((parsingError) => { msg.add(`${parsingError.message}: ${highlightSafeValue(parsingError.value)}`, 'issue'); });
+      const graphIsReversed = el('layout_reversegraph').checked;
+      goodFlows.forEach((flow) => {
+        const thisFlow = { hovering: false, index: approvedFlows.length, sourceRow: flow.sourceRow, operation: flow.operation, value: flow.amount, color: '', opacity: '', }, flowTargetPlus = flow.target.match(reFlowTargetWithSuffix);
+        if (flowTargetPlus !== null) { const [, possibleNodeName, possibleColor] = flowTargetPlus, colorOpacity = possibleColor.match(reColorPlusOpacity); if (colorOpacity !== null) { flow.target = possibleNodeName; if (colorOpacity[1]) { thisFlow.color = `#${colorOpacity[1]}`; } if (colorOpacity[2]) { thisFlow.opacity = colorOpacity[2]; } } }
+        thisFlow.source = setUpNode(flow.source, flow.sourceRow); thisFlow.target = setUpNode(flow.target, flow.sourceRow + 0.5);
+        if (graphIsReversed) { [thisFlow.source, thisFlow.target] = [thisFlow.target, thisFlow.source]; if (thisFlow.operation) { thisFlow.operation = thisFlow.operation === SYM_USE_REMAINDER ? SYM_FILL_MISSING : SYM_USE_REMAINDER; } }
+        approvedFlows.push(thisFlow);
+      });
+      const outOfSource = { node: 'source', dir: OUT }, intoTarget = { node: 'target', dir: IN }, calculationKeys = { [SYM_USE_REMAINDER]: { leaving: outOfSource, arriving: intoTarget }, [SYM_FILL_MISSING]: { leaving: intoTarget, arriving: outOfSource }, }, queueOfFlows = new Set(approvedFlows.filter((flow) => flow.operation)), involvedNodes = new Set();
+      queueOfFlows.forEach((f) => { const k = calculationKeys[f.operation]; f[k.leaving.node].unknowns[k.leaving.dir].add(f); involvedNodes.add(f[k.leaving.node].name); f[k.arriving.node].unknowns[k.arriving.dir].add(f); involvedNodes.add(f[k.arriving.node].name); });
+      if (queueOfFlows.size) { msg.logOnce('declareCalculations', '<b>Resolving calculated flows.</b>'); approvedFlows.forEach((f) => { f.source.terminates ??= { [IN]: true, [OUT]: true }; f.target.terminates ??= { [IN]: true, [OUT]: true }; f.source.terminates[OUT] &&= !involvedNodes.has(f.source.name); f.target.terminates[IN] &&= !involvedNodes.has(f.target.name); }); }
+      const parentUnknowns = new Map();
+      function resolveEligibleFlow(ef) {
+        const k = calculationKeys[ef.operation], parentN = ef[k.leaving.node], unknownCt = Math.trunc(parentUnknowns.get(ef)); let unknownMsg = '';
+        if (unknownCt > 1) { unknownMsg = ` (&lsquo;${parentN.tipname}&rsquo; had ${unknownCt} unknowns)`; msg.logOnce('warnAboutAmbiguousFlows', '<em>Note: Beyond this point, some flow amounts depended on multiple unknown values.<br>They will be resolved in the order of fewest unknowns + their order in the input data.</em>'); }
+        let [parentTotal, siblingTotal] = [0, 0];
+        approvedFlows.filter((af) => !flowIsCalculated(af.value) && [af[k.arriving.node].name, af[k.leaving.node].name].includes(parentN.name)).forEach((af) => { if (parentN.name === af[k.arriving.node].name) { parentTotal += Number(af.value); } else { siblingTotal += Number(af.value); } });
+        ef.value = Math.max(0, parentTotal - siblingTotal); ef[k.leaving.node].unknowns[k.leaving.dir].delete(ef); ef[k.arriving.node].unknowns[k.arriving.dir].delete(ef); queueOfFlows.delete(ef); msg.log(`<span class="info_text">Calculated:</span> ${escapeHTML(`${ef.source.tipname} [${ef.operation}] ${ef.target.tipname}`)} = <span class="calced">${ep(ef.value)}</span>${unknownMsg}`);
+      }
+      function has_one_unknown(flow) { return parentUnknowns.get(flow) === 1; }
+      while (queueOfFlows.size) {
+        parentUnknowns.clear();
+        queueOfFlows.forEach((f) => { const k = calculationKeys[f.operation], parentN = f[k.leaving.node]; f.terminalAdj ??= parentN.terminates[k.arriving.dir] || f[k.arriving.node].terminates[k.leaving.dir] ? 0.5 : 0; parentUnknowns.set(f, parentN.unknowns[IN].size + parentN.unknowns[OUT].size + f.terminalAdj); });
+        const sortedFlows = Array.from(queueOfFlows.values()).sort((a, b) => parentUnknowns.get(a) - parentUnknowns.get(b) || a.sourceRow - b.sourceRow);
+        if (has_one_unknown(sortedFlows[0])) { sortedFlows.filter((f) => has_one_unknown(f)).forEach((f) => resolveEligibleFlow(f)); } else { resolveEligibleFlow(sortedFlows[0]); }
+      }
+      Array.from(uniqueNodes.values()).sort((a, b) => a.sourceRow - b.sourceRow).forEach((n) => { const paintL = n.paintInputs.some((s) => s === '<<'), paintR = n.paintInputs.some((s) => s === '>>'); n.paint = { [BEFORE]: graphIsReversed ? paintR : paintL, [AFTER]: graphIsReversed ? paintL : paintR, }; delete n.paintInputs; n.index = approvedNodes.length; approvedNodes.push(n); });
+      const approvedCfg = {};
+      skmSettings.forEach((fldData, fldName) => { const [dataType, defaultVal] = fldData, fldVal = getHumanValueFromPage(fldName, dataType), sizeObj = dataType === 'contained' ? { w: approvedCfg.size_w, h: approvedCfg.size_h } : {}, [validSetting, finalValue] = settingIsValid(fldData, fldVal, sizeObj); if (validSetting) { approvedCfg[fldName] = finalValue; return; } const typedVal = settingHtoC(defaultVal, dataType); approvedCfg[fldName] = typedVal; setValueOnPage(fldName, dataType, typedVal); });
+      const chartEl = el('chart'); chartEl.style.height = `${approvedCfg.size_h}px`; chartEl.style.width = `${approvedCfg.size_w}px`;
+      [1, 2, 4, 6].forEach((s) => { el(`save_as_png_${s}x`).title = `PNG image file: ${approvedCfg.size_w * s} x ${approvedCfg.size_h * s}`; });
+      const updatedSourceLines = origSourceLines.map((l, i) => (linesWithValidSettings.has(i) ? `${settingsAppliedPrefix}${l}` : l));
+      if (glob.newInputsImportedFrom) { el(userInputsField).value = removeAutoLines(updatedSourceLines); msg.add(`Imported diagram from ${glob.newInputsImportedFrom}`); glob.newInputsImportedFrom = null; } else { el(userInputsField).value = updatedSourceLines.join('\n'); }
+      if (!goodFlows.length) { msg.add('Enter a list of Flows &mdash; one per line. See the <a href="/manual/" target="_blank">Manual</a> for more help.'); initializeDiagram(approvedCfg); updateColorThemeDisplay(); return null; }
+      const [groupMark, decimalMark] = approvedCfg.value_format, numberStyle = { marks: { group: groupMark === 'X' ? '' : groupMark, decimal: decimalMark, }, decimalPlaces: maxDecimalPlaces, trimString: approvedCfg.labelvalue_fullprecision ? '' : '~', prefix: approvedCfg.value_prefix, suffix: approvedCfg.value_suffix, };
+      if (approvedCfg.layout_reversegraph) { switch (approvedCfg.flow_inheritfrom) { case 'source': approvedCfg.flow_inheritfrom = 'target'; break; case 'target': approvedCfg.flow_inheritfrom = 'source'; break; } }
+      render_sankey(approvedNodes, approvedFlows, approvedCfg, numberStyle);
+      function withUnits(n) { return formatUserData(n, numberStyle); }
+      function explainSum(n, dir) { const formattedSum = withUnits(n.total[dir]), flowGroup = n.flows[dir].filter((f) => !f.isAShadow), flowCt = flowGroup.length; if (flowCt === 1) { return formattedSum; } const breakdown = flowGroup.map((f) => f.value).sort((a, b) => b - a).map((v) => withUnits(v)).join(' + '); return `<dfn title="${formattedSum} from ${flowCt} Flows: ${breakdown}">${formattedSum}</dfn>`; }
+      const epsilonDifference = 10 ** (-maxDecimalPlaces - 1), differences = [], grandTotal = { [IN]: 0, [OUT]: 0 };
+      approvedNodes.forEach((n, i) => { if (n.flows[IN].length && n.flows[OUT].length) { const difference = n.total[IN] - n.total[OUT]; if (Math.abs(difference) > epsilonDifference) { differences.push({ name: n.name, total: { [IN]: explainSum(n, IN), [OUT]: explainSum(n, OUT) }, difference: withUnits(difference), }); } } else { grandTotal[OUT] += n.total[IN]; grandTotal[IN] += n.total[OUT]; } if (n.value > maxNodeVal) { maxNodeIndex = i; maxNodeVal = n.value; } });
+      const disableDifferenceControls = !differences.length; ['meta_listimbalances', 'layout_attachto_leading', 'layout_attachto_trailing', 'layout_attachto_nearest'].forEach((id) => { el(id).disabled = disableDifferenceControls; }); el('imbalances_area').setAttribute('aria-disabled', disableDifferenceControls.toString());
+      if (!disableDifferenceControls && approvedCfg.meta_listimbalances) { const differenceRows = ['<tr><td></td><th>Total In</th><th>Total Out</th><th>Difference</th></tr>']; differences.forEach((diffRec) => { differenceRows.push(`<tr><td class="nodename">${escapeHTML(diffRec.name)}</td><td>${diffRec.total[IN]}</td><td>${diffRec.total[OUT]}</td><td>${diffRec.difference}</td></tr>`); }); msg.add(`<table class="center_basic">${differenceRows.join('\n')}</table>`, 'difference'); }
+      let totalsMsg = `<strong>${approvedFlows.length} Flows</strong> between <strong>${approvedNodes.length} Nodes</strong>. `;
+      if (Math.abs(grandTotal[IN] - grandTotal[OUT]) > epsilonDifference) { const gtLt = grandTotal[IN] > grandTotal[OUT] ? '&gt;' : '&lt;'; totalsMsg += `Total Inputs: <strong>${withUnits(grandTotal[IN])}</strong> ${gtLt} Total Outputs: <strong>${withUnits(grandTotal[OUT])}</strong>`; } else { totalsMsg += `Total Inputs = Total Outputs = <strong>${withUnits(grandTotal[IN])}</strong> &#9989;`; }
+      msg.add(totalsMsg, 'total'); updateColorThemeDisplay();
+      const tallestNodeHeight = parseFloat(el(`r${maxNodeIndex}`).getAttributeNS(null, 'height')), formattedPixelCount = updateMarks(d3.format(',.1f')(tallestNodeHeight), numberStyle.marks), unitsPerPixel = formatUserData(maxNodeVal / (tallestNodeHeight || Number.MIN_VALUE), { ...numberStyle, decimalPlaces: 4 });
+      el('scale_figures').innerHTML = `<strong>${unitsPerPixel}</strong> per pixel (${withUnits(maxNodeVal)}/${formattedPixelCount}px)`; updateResetNodesUI(); return null;
+    };
+    glob.debounced_process_sankey = debounce(glob.process_sankey);
+    loadFromQueryString(); glob.process_sankey();
+    }(typeof window === 'undefined' ? global : window));
+
+    // Client-side JS for Google Apps Script interaction
+
+    // Error handler for Apps Script calls
+    function showErrorAlert(error) {
+      console.error('Apps Script Error: ' + error.message);
+      alert('Error communicating with Google Sheets: ' + error.message);
+    }
+
+    // --- Get Data from Sheet ---
+    function populateTextareaWithSheetData(dataString) {
+      document.getElementById('flows_in').value = dataString;
+      // If the main process_sankey function is globally available from sankeymatic.js
+      if (typeof process_sankey === 'function') {
+        process_sankey(); // Redraw the diagram with new data
+      } else {
+        console.error('process_sankey function not found.');
+        alert('Could not redraw diagram. Main render function is missing.');
+      }
+    }
+
+    function handleGetData() {
+      google.script.run
+        .withSuccessHandler(populateTextareaWithSheetData)
+        .withFailureHandler(showErrorAlert)
+        .getDataFromSheet();
+    }
+
+    // --- Insert Image to Sheet ---
+    function showImageInsertedMessage() {
+      alert('Sankey diagram inserted into the active sheet.');
+      // Optionally, clear the diagram or provide other feedback
+    }
+
+    function handleInsertImage() {
+      // Ensure scaledPNG and fileTimestamp are available from sankeymatic.js
+      if (typeof scaledPNG !== 'function' || typeof fileTimestamp !== 'function') {
+        showErrorAlert({ message: 'Image processing functions (scaledPNG or fileTimestamp) are not available.' });
+        return;
+      }
+      try {
+        const scaleToUse = 2; // Default scale for insertion
+        const [size, pngDataUrl] = scaledPNG(scaleToUse);
+
+        if (!pngDataUrl || !pngDataUrl.startsWith('data:image/png')) {
+          showErrorAlert({ message: 'Failed to generate PNG image data.' });
+          return;
+        }
+        const filename = `sankey_diagram_${fileTimestamp()}.png`;
+        google.script.run
+          .withSuccessHandler(showImageInsertedMessage)
+          .withFailureHandler(showErrorAlert)
+          .insertImageToSheet(pngDataUrl, filename);
+      } catch (e) {
+        showErrorAlert({ message: 'Error generating image for insertion: ' + e.message });
+      }
+    }
+
+    // Attach event listeners once the DOM is loaded
+    document.addEventListener('DOMContentLoaded', function() {
+      const getDataButton = document.getElementById('get_data_button');
+      const insertImageButton = document.getElementById('insert_image_button');
+
+      if (getDataButton) {
+        getDataButton.onclick = handleGetData;
+      } else {
+        console.error("Button with ID 'get_data_button' not found.");
+      }
+
+      if (insertImageButton) {
+        insertImageButton.onclick = handleInsertImage;
+      } else {
+        console.error("Button with ID 'insert_image_button' not found.");
+      }
+    });
+  </script>
+</body>
+</html>
